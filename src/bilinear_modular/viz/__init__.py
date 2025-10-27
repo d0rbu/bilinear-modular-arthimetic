@@ -1,8 +1,8 @@
 """Visualization module for bilinear modular arithmetic."""
 
 from .eigenvectors import (
-    load_svd_results,
     load_metadata,
+    load_svd_results,
     plot_eigenvalue_spectrum,
     plot_eigenvector_2d_structure,
     plot_eigenvector_components,
