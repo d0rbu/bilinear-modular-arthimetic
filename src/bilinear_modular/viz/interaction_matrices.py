@@ -164,8 +164,7 @@ def visualize(
         bilinear_weights = checkpoint["bilinear_weights"]
     else:
         raise ValueError(
-            "Checkpoint structure not yet supported. "
-            "Need to implement model loading once nn.Module is defined."
+            "Checkpoint structure not yet supported. Need to implement model loading once nn.Module is defined."
         )
 
     d_out, d_in_0, d_in_1 = bilinear_weights.shape
