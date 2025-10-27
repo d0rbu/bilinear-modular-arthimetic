@@ -3,4 +3,4 @@
 from .core import ModularArithmeticDataset, generate_dataset
 
 __version__ = "0.1.0"
-__all__ = ["ModularArithmeticDataset", "generate_dataset"]
+__all__ = ["ModularArithmeticDataset", "generate_dataset", "exp", "viz"]
