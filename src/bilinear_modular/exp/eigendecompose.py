@@ -45,9 +45,7 @@ def eigendecompose(
     if "bilinear_weights" in checkpoint:
         bilinear_weights = checkpoint["bilinear_weights"]
     else:
-        raise ValueError(
-            "Checkpoint structure not yet supported. Need 'bilinear_weights' key in checkpoint."
-        )
+        raise ValueError("Checkpoint structure not yet supported. Need 'bilinear_weights' key in checkpoint.")
 
     d_out, d_in_0, d_in_1 = bilinear_weights.shape
     logger.info(f"Bilinear layer shape: ({d_out}, {d_in_0}, {d_in_1})")
@@ -105,4 +103,3 @@ def eigendecompose(
 
 if __name__ == "__main__":
     arguably.run()
-
