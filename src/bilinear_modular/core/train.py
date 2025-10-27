@@ -20,8 +20,8 @@ class TrainingConfig:
     mod_basis: int = 113
     hidden_dim: int = 100
     batch_size: int = 128
-    learning_rate: float = 3e-3
-    weight_decay: float = 0.5
+    learning_rate: float = 1e-3
+    weight_decay: float = 0.0
     epochs: int = 2000
     grad_accum_steps: int = 1
     checkpoint_dir: str = "checkpoints"
@@ -48,10 +48,10 @@ class BilinearModularModel(nn.Module):
 
         # Bilinear layer: combines two inputs via learned interaction
         if self.use_output_projection:
-            self.bilinear = nn.Bilinear(input_dim, input_dim, hidden_dim, bias=False)
-            self.output = nn.Linear(hidden_dim, output_dim, bias=False)
+            self.bilinear = nn.Bilinear(input_dim, input_dim, hidden_dim, bias=True)
+            self.output = nn.Linear(hidden_dim, output_dim, bias=True)
         else:
-            self.bilinear = nn.Bilinear(input_dim, input_dim, output_dim, bias=False)
+            self.bilinear = nn.Bilinear(input_dim, input_dim, output_dim, bias=True)
 
     def forward(self, a: th.Tensor, b: th.Tensor) -> th.Tensor:
         """Forward pass.
@@ -258,8 +258,8 @@ def train(
     use_output_projection: bool = False,
     hidden_dim: int = 100,
     batch_size: int = 128,
-    learning_rate: float = 3e-3,
-    weight_decay: float = 0.5,
+    learning_rate: float = 1e-3,
+    weight_decay: float = 0.0,
     epochs: int = 2000,
     grad_accum_steps: int = 1,
     checkpoint_dir: str = "checkpoints",
@@ -275,8 +275,8 @@ def train(
         mod_basis: The modulus for arithmetic (default: 113)
         hidden_dim: Hidden dimension size (default: 100)
         batch_size: Batch size for training (default: 128)
-        learning_rate: Learning rate (default: 3e-3)
-        weight_decay: Weight decay for AdamW (default: 0.5)
+        learning_rate: Learning rate (default: 1e-3)
+        weight_decay: Weight decay for AdamW (default: 0.0)
         epochs: Number of training epochs (default: 2000)
         grad_accum_steps: Gradient accumulation steps (default: 1)
         checkpoint_dir: Directory to save checkpoints (default: "checkpoints")
