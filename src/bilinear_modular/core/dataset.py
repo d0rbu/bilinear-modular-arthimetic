@@ -3,7 +3,6 @@
 import json
 from pathlib import Path
 
-import arguably
 import torch as th
 from loguru import logger
 
@@ -200,7 +199,6 @@ class ModularArithmeticDataset:
         return self.get_batch(batch_indices)
 
 
-@arguably.command
 def generate_dataset(
     mod_basis: int = 113,
     *,
@@ -274,7 +272,3 @@ def generate_dataset(
 
     # Return dataset instance
     return ModularArithmeticDataset(mod_basis=mod_basis, data_dir=output_path)
-
-
-if __name__ == "__main__":
-    arguably.run()
