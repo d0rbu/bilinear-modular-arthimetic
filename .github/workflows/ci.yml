@@ -52,7 +52,7 @@ jobs:
         run: uv sync --dev
 
       - name: Run ty type checking
-        run: uvx ty check
+        run: uv run ty check
 
   test:
     name: Tests
