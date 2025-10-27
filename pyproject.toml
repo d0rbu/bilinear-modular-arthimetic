@@ -3,7 +3,11 @@ name = "bilinear-modular"
 version = "0.1.0"
 description = "Training a bilinear layer on modular arithmetic"
 requires-python = ">=3.13"
-dependencies = []
+dependencies = [
+    "arguably>=1.2.5",
+    "numpy>=2.0.0",
+    "torch>=2.0.0",
+]
 
 [project.optional-dependencies]
 dev = [
