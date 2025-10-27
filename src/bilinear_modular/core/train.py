@@ -327,7 +327,7 @@ def train(
     # Compile model for speed
     if compile:
         logger.info("Compiling model with torch.compile...")
-        model = th.compile(model)  # type: ignore[misc]
+        model = th.compile(model, dynamic=False)  # type: ignore[misc]
 
     # Initialize optimizer
     optimizer = th.optim.AdamW(
