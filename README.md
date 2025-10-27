@@ -87,6 +87,32 @@ GitHub Actions automatically runs the following checks on every push and pull re
 
 All jobs run on Python 3.13.
 
+## Usage
+
+### Training
+
+Dataset generation and model training code is located in the `core/` directory (work in progress).
+
+### Visualization
+
+Once you have a trained model checkpoint, you can visualize the interaction matrices:
+
+```bash
+# Visualize with default settings (output indices 0, 1, 112 for mod 113)
+uv run python viz/interaction_matrices.py visualize checkpoints/model_epoch_2000.pt
+
+# Visualize specific output classes
+uv run python viz/interaction_matrices.py visualize checkpoints/model_epoch_2000.pt --output-indices 0 5 10 50 112
+
+# Change number of eigenvectors to plot
+uv run python viz/interaction_matrices.py visualize checkpoints/model_epoch_2000.pt --num-eigenvectors 10
+
+# Save to a different directory
+uv run python viz/interaction_matrices.py visualize checkpoints/model_epoch_2000.pt --output-dir figures/experiment_1
+```
+
+See [viz/README.md](viz/README.md) for detailed documentation on the visualization module.
+
 ## Project Structure
 
 ```
@@ -94,8 +120,14 @@ All jobs run on Python 3.13.
 ├── src/
 │   └── bilinear_modular/     # Main package
 │       └── __init__.py
+├── core/                      # Training code (in progress)
+├── viz/                       # Visualization tools
+│   ├── interaction_matrices.py
+│   └── README.md
+├── fig/                       # Output directory for figures
 ├── tests/                     # Test files
-│   └── test_placeholder.py
+│   ├── test_placeholder.py
+│   └── test_visualization.py
 ├── .github/
 │   └── workflows/
 │       └── ci.yml            # GitHub Actions CI
