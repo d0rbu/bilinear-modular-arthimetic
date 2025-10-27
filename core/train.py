@@ -9,7 +9,7 @@ import torch as th
 import torch.nn as nn
 from loguru import logger
 from tqdm import tqdm
-from trackio import Tracker
+import trackio
 
 
 @dataclass
@@ -39,9 +39,9 @@ class BilinearModularModel(nn.Module):
 
     def __init__(self, input_dim: int, hidden_dim: int, output_dim: int):
         super().__init__()
-        self.input_dim = input_dim
-        self.hidden_dim = hidden_dim
-        self.output_dim = output_dim
+        self.input_dim = input_dim  # type: ignore[misc]
+        self.hidden_dim = hidden_dim  # type: ignore[misc]
+        self.output_dim = output_dim  # type: ignore[misc]
 
         # Bilinear layer: combines two inputs via learned interaction
         self.bilinear = nn.Bilinear(input_dim, input_dim, hidden_dim, bias=True)
@@ -134,7 +134,7 @@ def train_epoch(
     train_loader: Any,  # TODO: Replace with actual dataloader type
     device: str,
     grad_accum_steps: int,
-    tracker: Tracker,
+    tracker: trackio.Run,
     epoch: int,
 ) -> float:
     """Train for one epoch.
@@ -312,17 +312,17 @@ def train(
     # Initialize model
     input_dim = mod_basis
     output_dim = mod_basis
-    model = BilinearModularModel(input_dim, hidden_dim, output_dim)
+    model: nn.Module = BilinearModularModel(input_dim, hidden_dim, output_dim)
     model = model.to(device)
 
     # Compile model for speed
     if compile and hasattr(th, "compile"):
         logger.info("Compiling model with torch.compile...")
-        model = th.compile(model)
+        model = th.compile(model)  # type: ignore[misc]
 
     # Initialize optimizer
     optimizer = th.optim.AdamW(
-        model.parameters(),
+        model.parameters(),  # type: ignore[misc]
         lr=learning_rate,
         weight_decay=weight_decay,
     )
@@ -336,7 +336,7 @@ def train(
         start_epoch = load_checkpoint(resume_from, model, optimizer)
 
     # Initialize tracker
-    tracker = Tracker(project_name="bilinear-modular-arithmetic")
+    tracker = trackio.init(project="bilinear-modular-arithmetic")
     tracker.log({"config": config})
 
     # TODO: Set up data loaders
