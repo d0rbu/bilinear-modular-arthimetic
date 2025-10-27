@@ -14,7 +14,7 @@ This project uses modern Python tooling for a streamlined development experience
 
 ### Prerequisites
 
-- Python 3.11 or higher
+- Python 3.13
 - [uv](https://docs.astral.sh/uv/getting-started/installation/) installed
 
 ### Installation
@@ -80,13 +80,12 @@ uv run pre-commit run --all-files
 
 ## Continuous Integration
 
-GitHub Actions automatically runs the following checks on every push and pull request:
-- Ruff linting
-- Ruff formatting verification
-- ty type checking
-- pytest test suite
+GitHub Actions automatically runs the following checks on every push and pull request, split into separate jobs:
+- **Linting and Formatting**: Ruff linting and formatting verification
+- **Type Checking**: ty type checking
+- **Tests**: pytest test suite
 
-The CI workflow tests against Python 3.11, 3.12, and 3.13.
+All jobs run on Python 3.13.
 
 ## Project Structure
 
@@ -113,4 +112,3 @@ The CI workflow tests against Python 3.11, 3.12, and 3.13.
 4. Verify type checking passes: `uvx ty check`
 
 Pre-commit hooks will automatically run these checks before each commit.
-

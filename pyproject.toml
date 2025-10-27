@@ -2,7 +2,7 @@
 name = "bilinear-modular"
 version = "0.1.0"
 description = "Training a bilinear layer on modular arithmetic"
-requires-python = ">=3.11"
+requires-python = ">=3.13"
 dependencies = []
 
 [project.optional-dependencies]
@@ -18,7 +18,7 @@ build-backend = "hatchling.build"
 
 [tool.ruff]
 line-length = 120
-target-version = "py311"
+target-version = "py313"
 
 [tool.ruff.lint]
 select = [
