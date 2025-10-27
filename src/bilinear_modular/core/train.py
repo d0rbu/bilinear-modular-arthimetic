@@ -1,6 +1,6 @@
 """Training loop for bilinear modular arithmetic with observability and checkpointing."""
 
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from pathlib import Path
 
 import arguably
@@ -345,7 +345,12 @@ def train(
 
     # Initialize tracker
     tracker = trackio.init(project="bilinear-modular-arithmetic")
-    tracker.log({"config": config})
+
+    # Start trackio server for viewing logs
+    trackio.show(project="bilinear-modular-arithmetic")
+
+    # Log configuration (convert dataclass to dict for JSON serialization)
+    tracker.log({"config": asdict(config)})
 
     # Set up dataset - generate if it doesn't exist
     data_dir = Path(f"data/{mod_basis}")
@@ -373,12 +378,18 @@ def train(
 
         val_loss, val_accuracy = validate(model, criterion, dataset, device)
 
-        logger.info(
+        # Log every epoch at debug level, every 200 epochs at info level
+        log_msg = (
             f"Epoch {epoch}/{epochs} - "
             f"Train Loss: {train_loss:.4f} - "
             f"Val Loss: {val_loss:.4f} - "
             f"Val Accuracy: {val_accuracy:.4f}"
         )
+
+        if epoch % 200 == 0 or epoch == epochs - 1:
+            logger.info(log_msg)
+        else:
+            logger.debug(log_msg)
 
         tracker.log(
             {
