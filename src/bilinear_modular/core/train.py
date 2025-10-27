@@ -1,5 +1,7 @@
 """Training loop for bilinear modular arithmetic with observability and checkpointing."""
 
+import sys
+import threading
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
@@ -39,7 +41,9 @@ class BilinearModularModel(nn.Module):
     The network takes two one-hot encoded inputs and outputs logits for the result.
     """
 
-    def __init__(self, input_dim: int, hidden_dim: int, output_dim: int, use_output_projection: bool = False):
+    def __init__(
+        self, input_dim: int, hidden_dim: int, output_dim: int, use_output_projection: bool = False, bias: bool = False
+    ):
         super().__init__()
         self.input_dim = input_dim  # type: ignore[misc]
         self.hidden_dim = hidden_dim  # type: ignore[misc]
@@ -48,10 +52,10 @@ class BilinearModularModel(nn.Module):
 
         # Bilinear layer: combines two inputs via learned interaction
         if self.use_output_projection:
-            self.bilinear = nn.Bilinear(input_dim, input_dim, hidden_dim, bias=False)
-            self.output = nn.Linear(hidden_dim, output_dim, bias=False)
+            self.bilinear = nn.Bilinear(input_dim, input_dim, hidden_dim, bias=bias)
+            self.output = nn.Linear(hidden_dim, output_dim, bias=bias)
         else:
-            self.bilinear = nn.Bilinear(input_dim, input_dim, output_dim, bias=False)
+            self.bilinear = nn.Bilinear(input_dim, input_dim, output_dim, bias=bias)
 
     def forward(self, a: th.Tensor, b: th.Tensor) -> th.Tensor:
         """Forward pass.
@@ -268,6 +272,7 @@ def train(
     compile: bool = True,
     seed: int = 0,
     resume_from: str | None = None,
+    log_level: str = "INFO",
 ) -> None:
     """Train a bilinear layer on modular arithmetic.
 
@@ -285,7 +290,13 @@ def train(
         compile: Whether to use torch.compile (default: True)
         seed: Random seed (default: 42)
         resume_from: Path to checkpoint to resume from (default: None)
+        log_level: Log level (default: "INFO")
     """
+
+    # Set log level
+    logger.remove()
+    logger.add(sys.stderr, level=log_level)
+
     # Set up config
     if device is None:
         device = "cuda" if th.cuda.is_available() else "cpu"
@@ -347,8 +358,9 @@ def train(
     # Initialize tracker
     tracker = trackio.init(project="bilinear-modular-arithmetic")
 
-    # Start trackio server for viewing logs
-    trackio.show(project="bilinear-modular-arithmetic")
+    # Start trackio server for viewing logs in a separate thread
+    trackio_thread = threading.Thread(target=trackio.show, args=("bilinear-modular-arithmetic",), daemon=True)
+    trackio_thread.start()
 
     # Log configuration (convert dataclass to dict for JSON serialization)
     tracker.log({"config": asdict(config)})
