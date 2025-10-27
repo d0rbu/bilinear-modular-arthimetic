@@ -9,6 +9,9 @@ dependencies = [
     "torch>=2.0.0",
 ]
 
+[project.scripts]
+bilinear-modular = "bilinear_modular.cli:main"
+
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0.0",
