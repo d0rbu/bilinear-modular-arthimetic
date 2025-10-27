@@ -6,9 +6,9 @@ from pathlib import Path
 import arguably
 import torch as th
 import torch.nn as nn
+import trackio
 from loguru import logger
 from tqdm import tqdm
-import trackio
 
 from src.bilinear_modular.core.dataset import ModularArithmeticDataset, generate_dataset
 
