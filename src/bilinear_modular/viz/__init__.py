@@ -19,4 +19,3 @@ __all__ = [
     "plot_eigenvector_2d_structure",
     "visualize_eigenvectors",
 ]
-

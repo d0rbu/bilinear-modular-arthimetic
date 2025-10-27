@@ -13,4 +13,3 @@ __all__ = [
     "eigendecompose_interaction_matrix",
     "eigendecompose",
 ]
-

@@ -134,7 +134,7 @@ def eigendecompose(
     # Process each output direction
     results = {}
     for output_idx in output_indices:
-        logger.info(f"Processing output direction {output_idx}/{d_out-1}")
+        logger.info(f"Processing output direction {output_idx}/{d_out - 1}")
 
         # Create one-hot output direction
         output_direction = th.zeros(d_out)
@@ -204,4 +204,3 @@ def eigendecompose(
 
 if __name__ == "__main__":
     arguably.run()
-

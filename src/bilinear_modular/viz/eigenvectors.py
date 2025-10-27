@@ -365,4 +365,3 @@ def visualize_eigenvectors(
 
 if __name__ == "__main__":
     arguably.run()
-
