@@ -11,6 +11,8 @@ import arguably
 import torch as th
 from loguru import logger
 
+from ..core.train import BilinearModularModel
+
 
 @arguably.command
 def eigendecompose(
@@ -41,11 +43,25 @@ def eigendecompose(
     checkpoint = th.load(checkpoint_path_obj, map_location="cpu", weights_only=False)
     logger.info("Checkpoint loaded successfully")
 
-    # Extract bilinear weights (following interaction_matrices.py pattern)
-    if "bilinear_weights" in checkpoint:
-        bilinear_weights = checkpoint["bilinear_weights"]
-    else:
-        raise ValueError("Checkpoint structure not yet supported. Need 'bilinear_weights' key in checkpoint.")
+    # Extract config from checkpoint
+    config = checkpoint.get("config", {})
+    input_dim = config.get("mod_basis", mod_basis)
+    hidden_dim = config.get("hidden_dim", 100)
+    output_dim = input_dim
+    use_output_projection = config.get("use_output_projection", False)
+
+    logger.info(
+        f"Creating model with input_dim={input_dim}, hidden_dim={hidden_dim}, "
+        f"output_dim={output_dim}, use_output_projection={use_output_projection}"
+    )
+
+    # Create model and load state dict
+    model = BilinearModularModel(input_dim, hidden_dim, output_dim, use_output_projection)
+    model.load_state_dict(checkpoint["model_state_dict"])
+    model.eval()
+
+    # Extract bilinear weights using model method
+    bilinear_weights = model.get_interaction_matrices()
 
     d_out, d_in_0, d_in_1 = bilinear_weights.shape
     logger.info(f"Bilinear layer shape: ({d_out}, {d_in_0}, {d_in_1})")
