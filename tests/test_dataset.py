@@ -205,4 +205,3 @@ def test_iterator_protocol(cleanup_test_data):
             break
 
     assert len(val_batches) == 2
-
