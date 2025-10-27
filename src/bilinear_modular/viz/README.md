@@ -19,7 +19,7 @@ where `v` is a one-hot vector with `v[c] = 1`. This gives us a `(d_in_0, d_in_1)
 Visualize interaction matrices for default output indices (0, 1, and P-1):
 
 ```bash
-uv run python viz/interaction_matrices.py visualize checkpoints/model_epoch_2000.pt
+uv run python -m bilinear_modular.viz.interaction_matrices visualize checkpoints/model_epoch_2000.pt
 ```
 
 ### Custom Output Indices
@@ -27,7 +27,7 @@ uv run python viz/interaction_matrices.py visualize checkpoints/model_epoch_2000
 Visualize specific output classes:
 
 ```bash
-uv run python viz/interaction_matrices.py visualize checkpoints/model_epoch_2000.pt --output-indices 0 5 10 50 112
+uv run python -m bilinear_modular.viz.interaction_matrices visualize checkpoints/model_epoch_2000.pt --output-indices 0 5 10 50 112
 ```
 
 ### Change Number of Eigenvectors
@@ -35,7 +35,7 @@ uv run python viz/interaction_matrices.py visualize checkpoints/model_epoch_2000
 By default, the top 5 eigenvectors are computed. To change this:
 
 ```bash
-uv run python viz/interaction_matrices.py visualize checkpoints/model_epoch_2000.pt --num-eigenvectors 10
+uv run python -m bilinear_modular.viz.interaction_matrices visualize checkpoints/model_epoch_2000.pt --num-eigenvectors 10
 ```
 
 ### Different Modular Basis
@@ -43,7 +43,7 @@ uv run python viz/interaction_matrices.py visualize checkpoints/model_epoch_2000
 If you trained with a different modular basis (default is 113):
 
 ```bash
-uv run python viz/interaction_matrices.py visualize checkpoints/model_epoch_2000.pt --mod-basis 97
+uv run python -m bilinear_modular.viz.interaction_matrices visualize checkpoints/model_epoch_2000.pt --mod-basis 97
 ```
 
 ### Custom Output Directory
@@ -51,7 +51,7 @@ uv run python viz/interaction_matrices.py visualize checkpoints/model_epoch_2000
 Save figures to a different directory:
 
 ```bash
-uv run python viz/interaction_matrices.py visualize checkpoints/model_epoch_2000.pt --output-dir figures/experiment_1
+uv run python -m bilinear_modular.viz.interaction_matrices visualize checkpoints/model_epoch_2000.pt --output-dir figures/experiment_1
 ```
 
 ## Output

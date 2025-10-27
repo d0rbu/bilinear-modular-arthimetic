@@ -1,16 +1,12 @@
 """Tests for visualization module."""
 
-# Import after adding parent to path
-import sys
 import tempfile
 from pathlib import Path
 
 import pytest
 import torch as th
 
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
-from viz.interaction_matrices import (
+from bilinear_modular.viz.interaction_matrices import (
     compute_interaction_matrix,
     compute_top_eigenvectors,
     extract_bilinear_weights,

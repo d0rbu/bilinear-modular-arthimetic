@@ -99,19 +99,19 @@ Once you have a trained model checkpoint, you can visualize the interaction matr
 
 ```bash
 # Visualize with default settings (output indices 0, 1, 112 for mod 113)
-uv run python viz/interaction_matrices.py visualize checkpoints/model_epoch_2000.pt
+uv run python -m bilinear_modular.viz.interaction_matrices visualize checkpoints/model_epoch_2000.pt
 
 # Visualize specific output classes
-uv run python viz/interaction_matrices.py visualize checkpoints/model_epoch_2000.pt --output-indices 0 5 10 50 112
+uv run python -m bilinear_modular.viz.interaction_matrices visualize checkpoints/model_epoch_2000.pt --output-indices 0 5 10 50 112
 
 # Change number of eigenvectors to plot
-uv run python viz/interaction_matrices.py visualize checkpoints/model_epoch_2000.pt --num-eigenvectors 10
+uv run python -m bilinear_modular.viz.interaction_matrices visualize checkpoints/model_epoch_2000.pt --num-eigenvectors 10
 
 # Save to a different directory
-uv run python viz/interaction_matrices.py visualize checkpoints/model_epoch_2000.pt --output-dir figures/experiment_1
+uv run python -m bilinear_modular.viz.interaction_matrices visualize checkpoints/model_epoch_2000.pt --output-dir figures/experiment_1
 ```
 
-See [viz/README.md](viz/README.md) for detailed documentation on the visualization module.
+See [src/bilinear_modular/viz/README.md](src/bilinear_modular/viz/README.md) for detailed documentation on the visualization module.
 
 ## Project Structure
 
@@ -119,11 +119,12 @@ See [viz/README.md](viz/README.md) for detailed documentation on the visualizati
 .
 ├── src/
 │   └── bilinear_modular/     # Main package
-│       └── __init__.py
+│       ├── __init__.py
+│       └── viz/              # Visualization tools
+│           ├── __init__.py
+│           ├── interaction_matrices.py
+│           └── README.md
 ├── core/                      # Training code (in progress)
-├── viz/                       # Visualization tools
-│   ├── interaction_matrices.py
-│   └── README.md
 ├── fig/                       # Output directory for figures
 ├── tests/                     # Test files
 │   ├── test_placeholder.py
