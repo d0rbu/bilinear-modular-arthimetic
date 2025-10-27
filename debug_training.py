@@ -1,9 +1,12 @@
 """Debug script to understand the training issue."""
+
+from pathlib import Path
+
 import torch as th
 import torch.nn as nn
+
 from src.bilinear_modular.core.dataset import ModularArithmeticDataset, generate_dataset
 from src.bilinear_modular.core.train import BilinearModularModel
-from pathlib import Path
 
 # Generate small dataset if needed
 mod_basis = 113
@@ -36,8 +39,10 @@ print(f"\nTotal parameters: {sum(p.numel() for p in model.parameters())}")
 # Check weight initialization
 print("\n=== Weight Statistics ===")
 for name, param in model.named_parameters():
-    print(f"{name}: mean={param.mean().item():.6f}, std={param.std().item():.6f}, "
-          f"min={param.min().item():.6f}, max={param.max().item():.6f}")
+    print(
+        f"{name}: mean={param.mean().item():.6f}, std={param.std().item():.6f}, "
+        f"min={param.min().item():.6f}, max={param.max().item():.6f}"
+    )
 
 # Get a batch and check the forward pass
 print("\n=== Forward Pass Check ===")
@@ -69,7 +74,7 @@ print(f"Targets (first 10): {targets_class[:10].tolist()}")
 print(f"Accuracy: {(predictions == targets_class).float().mean().item():.6f}")
 
 # Random baseline
-print(f"\nRandom baseline accuracy: {1/mod_basis:.6f}")
+print(f"\nRandom baseline accuracy: {1 / mod_basis:.6f}")
 
 # Check gradient flow
 print("\n=== Gradient Check ===")
@@ -90,16 +95,16 @@ for step in range(5):
     inputs, targets = next(iter(dataset.train()))
     a = inputs[:, :mod_basis]
     b = inputs[:, mod_basis:]
-    
+
     logits = model(a, b)
     loss = criterion(logits, targets)
-    
+
     optimizer.zero_grad()
     loss.backward()
     optimizer.step()
-    
+
     predictions = th.argmax(logits, dim=1)
     targets_class = th.argmax(targets, dim=1)
     acc = (predictions == targets_class).float().mean().item()
-    
+
     print(f"Step {step}: loss={loss.item():.6f}, acc={acc:.6f}")

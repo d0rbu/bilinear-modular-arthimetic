@@ -1,9 +1,12 @@
 """Test the fixes."""
+
+from pathlib import Path
+
 import torch as th
 import torch.nn as nn
+
 from src.bilinear_modular.core.dataset import ModularArithmeticDataset
 from src.bilinear_modular.core.train import BilinearModularModel
-from pathlib import Path
 
 # Load dataset
 mod_basis = 113
@@ -44,23 +47,23 @@ for step in range(10):
     inputs, targets = next(iter(dataset.train()))
     a = inputs[:, :mod_basis]
     b = inputs[:, mod_basis:]
-    
+
     logits = model(a, b)
     loss = criterion(logits, targets)
-    
+
     optimizer.zero_grad()
     loss.backward()
     optimizer.step()
-    
+
     predictions = th.argmax(logits, dim=1)
     targets_class = th.argmax(targets, dim=1)
     acc = (predictions == targets_class).float().mean().item()
-    
+
     if step == 0:
         # Check gradient magnitude
         grad_std = model.bilinear.weight.grad.std().item()
         print(f"Initial gradient std: {grad_std:.6f}")
-    
+
     print(f"Step {step}: loss={loss.item():.4f}, acc={acc:.4f}")
 
 print("\nExpected: Loss should decrease and accuracy should improve!")
