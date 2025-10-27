@@ -1,8 +1,8 @@
 """Visualization module for bilinear modular arithmetic."""
 
 from .eigenvectors import (
-    load_eigendecomp_results,
-    load_summary,
+    load_svd_results,
+    load_metadata,
     plot_eigenvalue_spectrum,
     plot_eigenvector_2d_structure,
     plot_eigenvector_components,
@@ -11,8 +11,8 @@ from .eigenvectors import (
 )
 
 __all__ = [
-    "load_eigendecomp_results",
-    "load_summary",
+    "load_svd_results",
+    "load_metadata",
     "plot_eigenvalue_spectrum",
     "plot_eigenvector_components",
     "plot_top_eigenvectors_heatmap",
