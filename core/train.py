@@ -7,9 +7,9 @@ from typing import Any
 import arguably
 import torch as th
 import torch.nn as nn
-import trackio
 from loguru import logger
 from tqdm import tqdm
+from trackio import Tracker
 
 
 @dataclass
@@ -27,7 +27,7 @@ class TrainingConfig:
     checkpoint_every: int = 100
     device: str = "cuda" if th.cuda.is_available() else "cpu"
     compile: bool = True
-    seed: int = 0
+    seed: int = 42
 
 
 class BilinearModularModel(nn.Module):
@@ -37,21 +37,20 @@ class BilinearModularModel(nn.Module):
     The network takes two one-hot encoded inputs and outputs logits for the result.
     """
 
-    def __init__(self, input_dim: int, hidden_dim: int, output_dim: int, use_output_projection: bool = True):
+    def __init__(self, input_dim: int, hidden_dim: int, output_dim: int):
         super().__init__()
-        self.input_dim = input_dim  # type: ignore[misc]
-        self.hidden_dim = hidden_dim  # type: ignore[misc]
-        self.output_dim = output_dim  # type: ignore[misc]
-        self.use_output_projection = use_output_projection
+        self.input_dim = input_dim
+        self.hidden_dim = hidden_dim
+        self.output_dim = output_dim
 
         # Bilinear layer: combines two inputs via learned interaction
         self.bilinear = nn.Bilinear(input_dim, input_dim, hidden_dim, bias=True)
 
-        # Optional output projection
-        if use_output_projection:
-            self.output = nn.Linear(hidden_dim, output_dim)
-        else:
-            self.output = None
+        # Output projection
+        self.output = nn.Linear(hidden_dim, output_dim)
+
+        # Activation
+        self.relu = nn.ReLU()
 
     def forward(self, a: th.Tensor, b: th.Tensor) -> th.Tensor:
         """Forward pass.
@@ -65,9 +64,10 @@ class BilinearModularModel(nn.Module):
         """
         # Bilinear interaction between inputs
         hidden = self.bilinear(a, b)
+        hidden = self.relu(hidden)
 
-        # Project to output if using output projection
-        logits = self.output(hidden) if self.use_output_projection else hidden
+        # Project to output
+        logits = self.output(hidden)
 
         return logits
 
@@ -80,6 +80,14 @@ class BilinearModularModel(nn.Module):
         """
         # The bilinear layer weight has shape (hidden_dim, input_dim, input_dim)
         return self.bilinear.weight.data
+
+
+def setup_checkpointing(checkpoint_dir: str) -> Path:
+    """Set up checkpoint directory."""
+    checkpoint_path = Path(checkpoint_dir)
+    checkpoint_path.mkdir(parents=True, exist_ok=True)
+    logger.info(f"Checkpoint directory: {checkpoint_path.absolute()}")
+    return checkpoint_path
 
 
 def save_checkpoint(
@@ -98,7 +106,7 @@ def save_checkpoint(
             "model_state_dict": model.state_dict(),
             "optimizer_state_dict": optimizer.state_dict(),
             "loss": loss,
-            "config": vars(config),
+            "config": config,
         },
         checkpoint_file,
     )
@@ -126,7 +134,7 @@ def train_epoch(
     train_loader: Any,  # TODO: Replace with actual dataloader type
     device: str,
     grad_accum_steps: int,
-    tracker: trackio.Run,
+    tracker: Tracker,
     epoch: int,
 ) -> float:
     """Train for one epoch.
@@ -241,7 +249,6 @@ def validate(
 
 @arguably.command
 def train(
-    *,
     mod_basis: int = 113,
     hidden_dim: int = 100,
     batch_size: int = 128,
@@ -253,7 +260,7 @@ def train(
     checkpoint_every: int = 100,
     device: str | None = None,
     compile: bool = True,
-    seed: int = 0,
+    seed: int = 42,
     resume_from: str | None = None,
 ) -> None:
     """Train a bilinear layer on modular arithmetic.
@@ -300,24 +307,22 @@ def train(
         th.cuda.manual_seed_all(seed)
 
     # Set up checkpoint directory
-    checkpoint_path = Path(checkpoint_dir)
-    checkpoint_path.mkdir(parents=True, exist_ok=True)
-    logger.info(f"Checkpoint directory: {checkpoint_path.absolute()}")
+    setup_checkpointing(checkpoint_dir)
 
     # Initialize model
     input_dim = mod_basis
     output_dim = mod_basis
-    model: nn.Module = BilinearModularModel(input_dim, hidden_dim, output_dim)
+    model = BilinearModularModel(input_dim, hidden_dim, output_dim)
     model = model.to(device)
 
     # Compile model for speed
-    if compile:
+    if compile and hasattr(th, "compile"):
         logger.info("Compiling model with torch.compile...")
-        model = th.compile(model)  # type: ignore[misc]
+        model = th.compile(model)
 
     # Initialize optimizer
     optimizer = th.optim.AdamW(
-        model.parameters(),  # type: ignore[misc]
+        model.parameters(),
         lr=learning_rate,
         weight_decay=weight_decay,
     )
@@ -331,7 +336,7 @@ def train(
         start_epoch = load_checkpoint(resume_from, model, optimizer)
 
     # Initialize tracker
-    tracker = trackio.init(project="bilinear-modular-arithmetic")
+    tracker = Tracker(project_name="bilinear-modular-arithmetic")
     tracker.log({"config": config})
 
     # TODO: Set up data loaders
