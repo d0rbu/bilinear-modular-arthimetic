@@ -37,25 +37,6 @@ uv run python -m core.train train --resume-from checkpoints/checkpoint_epoch_100
 uv run python -m core.train train --grad-accum-steps 4
 ```
 
-### `visualize.py`
-Visualization utilities for analyzing learned interaction matrices and eigenvectors.
-
-**Features:**
-- Plot interaction matrices from bilinear weights
-- Compute and visualize eigendecomposition
-- Plot eigenvalue spectrum across all hidden units
-- Analyze top eigenvector components
-
-**Usage:**
-```bash
-# Visualize a checkpoint
-uv run python -m core.visualize visualize-checkpoint \
-  checkpoints/checkpoint_epoch_2000.pt \
-  --output-dir visualizations \
-  --num-matrices 9 \
-  --num-eigenvectors 5
-```
-
 ## Model Architecture
 
 The bilinear model learns modular addition through a simple architecture:
@@ -109,4 +90,3 @@ Where each batch yields `(a, b, targets)` with:
 - `a`: one-hot encoded first operand
 - `b`: one-hot encoded second operand  
 - `targets`: integer labels for (a + b) mod P
-
