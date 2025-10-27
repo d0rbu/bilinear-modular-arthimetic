@@ -34,16 +34,16 @@ def plot_interaction_matrix(
         vmin: Minimum value for colormap
         vmax: Maximum value for colormap
     """
-    matrix_np = matrix.detach().cpu().numpy()
+    matrix_cpu = matrix.detach().cpu()
 
     # Auto-scale if not provided
     if vmin is None:
-        vmin = -abs(matrix_np).max()
+        vmin = -matrix_cpu.abs().max().item()
     if vmax is None:
-        vmax = abs(matrix_np).max()
+        vmax = matrix_cpu.abs().max().item()
 
     fig, ax = plt.subplots(figsize=(10, 8))
-    im = ax.imshow(matrix_np, cmap=cmap, aspect="auto", vmin=vmin, vmax=vmax)
+    im = ax.imshow(matrix_cpu, cmap=cmap, aspect="auto", vmin=vmin, vmax=vmax)
 
     if title is None:
         title = f"Interaction Matrix for Output Class {output_idx}"
@@ -83,11 +83,11 @@ def plot_singular_vectors(  # noqa: N802
         num_components: Number of top components to plot
         title: Optional custom title
     """
-    U_np = U.detach().cpu().numpy()  # noqa: N806
-    S_np = S.detach().cpu().numpy()  # noqa: N806
-    Vh_np = Vh.detach().cpu().numpy()  # noqa: N806
+    U_cpu = U.detach().cpu()  # noqa: N806
+    S_cpu = S.detach().cpu()  # noqa: N806
+    Vh_cpu = Vh.detach().cpu()  # noqa: N806
 
-    k = min(num_components, len(S_np))
+    k = min(num_components, len(S_cpu))
 
     fig, axes = plt.subplots(2, k, figsize=(4 * k, 8))
     if k == 1:
@@ -96,16 +96,16 @@ def plot_singular_vectors(  # noqa: N802
     for i in range(k):
         # Plot left singular vector (U)
         ax_u = axes[0, i]
-        u_vec = U_np[:, i]
+        u_vec = U_cpu[:, i]
         ax_u.bar(range(len(u_vec)), u_vec)
-        ax_u.set_title(f"U[{i}] (σ = {S_np[i]:.3f})")
+        ax_u.set_title(f"U[{i}] (σ = {S_cpu[i]:.3f})")
         ax_u.set_xlabel("Component Index")
         ax_u.set_ylabel("Value")
         ax_u.grid(True, alpha=0.3)
 
         # Plot right singular vector (Vh)
         ax_v = axes[1, i]
-        v_vec = Vh_np[i, :]
+        v_vec = Vh_cpu[i, :]
         ax_v.bar(range(len(v_vec)), v_vec)
         ax_v.set_title(f"V[{i}]")
         ax_v.set_xlabel("Component Index")
