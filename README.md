@@ -104,13 +104,20 @@ print(f"Total samples: {len(dataset)}")  # 113 * 113 = 12769
 print(f"Training samples: {dataset.train_size}")  # 80% = 10215
 print(f"Validation samples: {dataset.val_size}")  # 20% = 2554
 
-# Get training batches
-inputs, targets = dataset.get_train_batch(batch_size=128, as_torch=True)
+# Get training batches (returns torch tensors)
+inputs, targets = dataset.get_train_batch(batch_size=128)
 # inputs: (128, 226) - one-hot encoded [a, b]
 # targets: (128, 113) - one-hot encoded c where c = (a + b) % 113
 
 # Get all training data
-all_train_inputs, all_train_targets = dataset.get_all_train(as_torch=True)
+all_train_inputs, all_train_targets = dataset.get_all_train()
+
+# Use as iterator for training loops
+dataset.batch_size = 128
+dataset.train()  # Set to training mode
+for inputs, targets in dataset:
+    # Your training code here
+    pass
 
 # Load existing dataset
 dataset = ModularArithmeticDataset(mod_basis=113)
@@ -120,10 +127,11 @@ For a complete example, see `examples/generate_dataset_example.py`.
 
 ### Dataset Features
 
-- **Automatic caching**: Datasets are saved to `data/{mod_basis}/` for reuse
+- **Automatic caching**: Datasets are saved to `data/{mod_basis}/` for reuse as .pt files
+- **Pure PyTorch**: All data stored and returned as PyTorch tensors (no numpy)
 - **One-hot encoding**: Optional one-hot encoding of inputs and outputs
 - **Efficient batching**: Simple API for getting training/validation batches
-- **PyTorch integration**: Convert to PyTorch tensors with `as_torch=True`
+- **Iterator protocol**: Supports `__iter__` and `__next__` for easy training loops
 - **Reproducible splits**: Consistent 80/20 train/val split with fixed seed
 
 ## Project Structure
