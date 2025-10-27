@@ -9,7 +9,12 @@ dependencies = [
     "matplotlib>=3.9.0",
     "numpy>=2.0.0",
     "torch>=2.0.0",
+    "trackio>=0.1.0",
+    "tqdm>=4.65.0",
 ]
+
+[project.scripts]
+bilinear-modular = "bilinear_modular.cli:main"
 
 [project.optional-dependencies]
 dev = [
@@ -58,4 +63,5 @@ dev = [
     "pre-commit>=4.3.0",
     "pytest>=8.4.2",
     "ruff>=0.14.2",
+    "ty",
 ]
