@@ -10,7 +10,7 @@ import trackio
 from loguru import logger
 from tqdm import tqdm
 
-from src.bilinear_modular.core.dataset import ModularArithmeticDataset, generate_dataset
+from .dataset import ModularArithmeticDataset, generate_dataset
 
 
 @dataclass
