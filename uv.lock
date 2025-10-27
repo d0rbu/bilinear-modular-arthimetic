@@ -22,7 +22,6 @@ dependencies = [
     { name = "arguably" },
     { name = "loguru" },
     { name = "matplotlib" },
-    { name = "numpy" },
     { name = "torch" },
 ]
 
@@ -45,7 +44,6 @@ requires-dist = [
     { name = "arguably", specifier = ">=1.2.0" },
     { name = "loguru", specifier = ">=0.7.0" },
     { name = "matplotlib", specifier = ">=3.7.0" },
-    { name = "numpy", specifier = ">=1.24.0" },
     { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=4.0.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.8.0" },

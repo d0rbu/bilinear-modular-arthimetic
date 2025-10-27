@@ -3,19 +3,46 @@
 import tempfile
 from pathlib import Path
 
-import pytest
 import torch as th
 
-from bilinear_modular.viz.interaction_matrices import (
-    compute_interaction_matrix,
-    compute_top_eigenvectors,
-    extract_bilinear_weights,
-    load_checkpoint,
-)
+from bilinear_modular.viz.interaction_matrices import plot_interaction_matrix, plot_singular_vectors
 
 
-def test_compute_interaction_matrix():
-    """Test interaction matrix computation."""
+def test_plot_interaction_matrix():
+    """Test interaction matrix plotting."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        save_path = Path(tmpdir) / "test_matrix.png"
+
+        # Create simple interaction matrix
+        matrix = th.randn(10, 10)
+
+        # Plot it
+        plot_interaction_matrix(matrix, output_idx=0, save_path=save_path)
+
+        # Check that file was created
+        assert save_path.exists()
+
+
+def test_plot_singular_vectors():
+    """Test singular vector plotting."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        save_path = Path(tmpdir) / "test_svd.png"
+
+        # Create SVD components
+        m, n = 10, 8
+        U = th.randn(m, n)  # noqa: N806
+        S = th.rand(n)  # noqa: N806
+        Vh = th.randn(n, n)  # noqa: N806
+
+        # Plot them
+        plot_singular_vectors(U, S, Vh, output_idx=0, save_path=save_path, num_components=3)
+
+        # Check that file was created
+        assert save_path.exists()
+
+
+def test_interaction_matrix_computation():
+    """Test interaction matrix computation using einsum."""
     # Create simple bilinear weights
     d_out, d_in_0, d_in_1 = 3, 4, 5
     bilinear_weights = th.randn(d_out, d_in_0, d_in_1)
@@ -24,8 +51,8 @@ def test_compute_interaction_matrix():
     output_vec = th.zeros(d_out)
     output_vec[0] = 1.0
 
-    # Compute interaction matrix
-    interaction = compute_interaction_matrix(bilinear_weights, output_vec)
+    # Compute interaction matrix using einsum
+    interaction = th.einsum("ijk,i->jk", bilinear_weights, output_vec)
 
     # Check shape
     assert interaction.shape == (d_in_0, d_in_1)
@@ -34,7 +61,7 @@ def test_compute_interaction_matrix():
     assert th.allclose(interaction, bilinear_weights[0])
 
 
-def test_compute_interaction_matrix_weighted():
+def test_interaction_matrix_weighted():
     """Test interaction matrix with weighted output vector."""
     d_out, d_in_0, d_in_1 = 3, 4, 5
     bilinear_weights = th.randn(d_out, d_in_0, d_in_1)
@@ -42,8 +69,8 @@ def test_compute_interaction_matrix_weighted():
     # Create weighted output vector
     output_vec = th.tensor([0.5, 0.3, 0.2])
 
-    # Compute interaction matrix
-    interaction = compute_interaction_matrix(bilinear_weights, output_vec)
+    # Compute interaction matrix using einsum
+    interaction = th.einsum("ijk,i->jk", bilinear_weights, output_vec)
 
     # Check shape
     assert interaction.shape == (d_in_0, d_in_1)
@@ -53,100 +80,23 @@ def test_compute_interaction_matrix_weighted():
     assert th.allclose(interaction, expected)
 
 
-def test_compute_top_eigenvectors():
-    """Test eigenvector computation."""
-    # Create symmetric matrix for real eigenvalues
-    n = 10
-    matrix = th.randn(n, n)
-    matrix = (matrix + matrix.T) / 2  # Make symmetric
+def test_svd_computation():
+    """Test SVD computation on interaction matrices."""
+    # Create a random matrix
+    m, n = 10, 8
+    matrix = th.randn(m, n)
 
-    k = 3
-    eigenvalues, eigenvectors = compute_top_eigenvectors(matrix, k=k)
+    # Compute SVD
+    U, S, Vh = th.linalg.svd(matrix, full_matrices=False)  # noqa: N806
 
     # Check shapes
-    assert eigenvalues.shape == (k,)
-    assert eigenvectors.shape == (n, k)
+    assert U.shape == (m, min(m, n))
+    assert S.shape == (min(m, n),)
+    assert Vh.shape == (min(m, n), n)
 
-    # Check that eigenvalues are sorted by absolute value
-    abs_vals = th.abs(eigenvalues)
-    assert th.all(abs_vals[:-1] >= abs_vals[1:])
+    # Check that singular values are sorted
+    assert th.all(S[:-1] >= S[1:])
 
-
-def test_load_checkpoint_with_model_state_dict():
-    """Test loading checkpoint with model_state_dict key."""
-    with tempfile.TemporaryDirectory() as tmpdir:
-        checkpoint_path = Path(tmpdir) / "test_checkpoint.pt"
-
-        # Create test checkpoint
-        bilinear_weights = th.randn(5, 10, 10)
-        checkpoint = {
-            "model_state_dict": {"bilinear.weight": bilinear_weights},
-            "epoch": 100,
-        }
-        th.save(checkpoint, checkpoint_path)
-
-        # Load and extract
-        loaded = load_checkpoint(checkpoint_path)
-        weights = extract_bilinear_weights(loaded)
-
-        assert th.allclose(weights, bilinear_weights)
-
-
-def test_load_checkpoint_direct_state_dict():
-    """Test loading checkpoint with weights directly in state dict."""
-    with tempfile.TemporaryDirectory() as tmpdir:
-        checkpoint_path = Path(tmpdir) / "test_checkpoint.pt"
-
-        # Create test checkpoint (direct state dict)
-        bilinear_weights = th.randn(5, 10, 10)
-        checkpoint = {"bilinear_layer.weight": bilinear_weights}
-        th.save(checkpoint, checkpoint_path)
-
-        # Load and extract
-        loaded = load_checkpoint(checkpoint_path)
-        weights = extract_bilinear_weights(loaded)
-
-        assert th.allclose(weights, bilinear_weights)
-
-
-def test_extract_bilinear_weights_fallback():
-    """Test fallback weight extraction based on shape."""
-    with tempfile.TemporaryDirectory() as tmpdir:
-        checkpoint_path = Path(tmpdir) / "test_checkpoint.pt"
-
-        # Create checkpoint without 'bilinear' in key name
-        weights_3d = th.randn(5, 10, 10)
-        checkpoint = {
-            "model_state_dict": {
-                "layer.weight": weights_3d,
-                "other.weight": th.randn(5, 10),  # 2D, should be ignored
-            }
-        }
-        th.save(checkpoint, checkpoint_path)
-
-        # Load and extract
-        loaded = load_checkpoint(checkpoint_path)
-        weights = extract_bilinear_weights(loaded)
-
-        # Should find the 3D tensor
-        assert th.allclose(weights, weights_3d)
-
-
-def test_extract_bilinear_weights_error():
-    """Test error handling when no bilinear weights found."""
-    with tempfile.TemporaryDirectory() as tmpdir:
-        checkpoint_path = Path(tmpdir) / "test_checkpoint.pt"
-
-        # Create checkpoint with no 3D weights
-        checkpoint = {
-            "model_state_dict": {
-                "layer1.weight": th.randn(5, 10),
-                "layer2.weight": th.randn(10, 5),
-            }
-        }
-        th.save(checkpoint, checkpoint_path)
-
-        # Should raise error
-        loaded = load_checkpoint(checkpoint_path)
-        with pytest.raises(ValueError, match="Could not find bilinear weights"):
-            extract_bilinear_weights(loaded)
+    # Check reconstruction (approximately)
+    reconstructed = U @ th.diag(S) @ Vh
+    assert th.allclose(reconstructed, matrix, atol=1e-5)

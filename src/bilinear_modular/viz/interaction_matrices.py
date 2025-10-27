@@ -3,115 +3,15 @@
 This module provides functionality to:
 1. Load checkpoints from trained bilinear models
 2. Extract and visualize interaction matrices for specific outputs
-3. Compute and visualize top eigenvector components
+3. Compute and visualize top singular vector components
 """
 
 from pathlib import Path
 
 import arguably
 import matplotlib.pyplot as plt
-import numpy as np
 import torch as th
 from loguru import logger
-
-
-def load_checkpoint(checkpoint_path: Path) -> dict:
-    """Load a model checkpoint.
-
-    Args:
-        checkpoint_path: Path to the checkpoint file
-
-    Returns:
-        Dictionary containing model state and metadata
-    """
-    logger.info(f"Loading checkpoint from {checkpoint_path}")
-    checkpoint = th.load(checkpoint_path, map_location="cpu", weights_only=False)
-    logger.info("Checkpoint loaded successfully")
-    return checkpoint
-
-
-def extract_bilinear_weights(checkpoint: dict) -> th.Tensor:
-    """Extract bilinear layer weights from checkpoint.
-
-    Args:
-        checkpoint: Loaded checkpoint dictionary
-
-    Returns:
-        Bilinear weights tensor of shape (d_out, d_in_0, d_in_1)
-    """
-    # Look for bilinear weights in the checkpoint
-    # The exact key depends on how the model was saved
-    # Common patterns: 'model.weight', 'bilinear.weight', etc.
-
-    if "model_state_dict" in checkpoint:
-        state_dict = checkpoint["model_state_dict"]
-    elif "model" in checkpoint:
-        state_dict = checkpoint["model"]
-    else:
-        state_dict = checkpoint
-
-    # Find bilinear weight key
-    bilinear_keys = [k for k in state_dict if "bilinear" in k.lower() and "weight" in k]
-
-    if not bilinear_keys:
-        # Fallback: look for any weight tensor with 3 dimensions
-        weight_keys = [k for k in state_dict if "weight" in k]
-        for key in weight_keys:
-            tensor = state_dict[key]
-            if tensor.ndim == 3:
-                logger.warning(f"Using {key} as bilinear weights (guessing based on shape)")
-                return tensor
-        raise ValueError(f"Could not find bilinear weights in checkpoint. Available keys: {list(state_dict.keys())}")
-
-    key = bilinear_keys[0]
-    logger.info(f"Found bilinear weights at key: {key}")
-    return state_dict[key]
-
-
-def compute_interaction_matrix(bilinear_weights: th.Tensor, output_vec: th.Tensor) -> th.Tensor:
-    """Compute interaction matrix for a specific output vector.
-
-    The interaction matrix is computed as a weighted sum:
-        M = sum_i bilinear_weights[i] * output_vec[i]
-
-    This gives us a (d_in_0, d_in_1) matrix showing how the two inputs
-    interact to produce the weighted output.
-
-    Args:
-        bilinear_weights: Tensor of shape (d_out, d_in_0, d_in_1)
-        output_vec: Output vector of shape (d_out,) for weighting
-
-    Returns:
-        Interaction matrix of shape (d_in_0, d_in_1)
-    """
-    # Einsum notation: i is d_out, j is d_in_0, k is d_in_1
-    # We want: M[j,k] = sum_i W[i,j,k] * v[i]
-    interaction = th.einsum("ijk,i->jk", bilinear_weights, output_vec)
-    return interaction
-
-
-def compute_top_eigenvectors(matrix: th.Tensor, k: int = 5) -> tuple[th.Tensor, th.Tensor]:
-    """Compute top k eigenvectors and eigenvalues of a matrix.
-
-    Args:
-        matrix: Square matrix to decompose
-        k: Number of top eigenvectors to return
-
-    Returns:
-        Tuple of (eigenvalues, eigenvectors) for top k components
-    """
-    # Convert to numpy for eigendecomposition
-    matrix_np = matrix.detach().cpu().numpy()
-
-    # Compute eigendecomposition
-    eigenvalues, eigenvectors = np.linalg.eig(matrix_np)
-
-    # Sort by absolute value of eigenvalues
-    idx = np.argsort(np.abs(eigenvalues))[::-1]
-    eigenvalues = eigenvalues[idx[:k]]
-    eigenvectors = eigenvectors[:, idx[:k]]
-
-    return th.from_numpy(eigenvalues), th.from_numpy(eigenvectors)
 
 
 def plot_interaction_matrix(
@@ -138,9 +38,9 @@ def plot_interaction_matrix(
 
     # Auto-scale if not provided
     if vmin is None:
-        vmin = -np.abs(matrix_np).max()
+        vmin = -abs(matrix_np).max()
     if vmax is None:
-        vmax = np.abs(matrix_np).max()
+        vmax = abs(matrix_np).max()
 
     fig, ax = plt.subplots(figsize=(10, 8))
     im = ax.imshow(matrix_np, cmap=cmap, aspect="auto", vmin=vmin, vmax=vmax)
@@ -163,55 +63,64 @@ def plot_interaction_matrix(
     logger.info(f"Saved interaction matrix plot to {save_path}")
 
 
-def plot_eigenvector_components(
-    eigenvectors: th.Tensor,
-    eigenvalues: th.Tensor,
+def plot_singular_vectors(  # noqa: N802
+    U: th.Tensor,  # noqa: N803
+    S: th.Tensor,  # noqa: N803
+    Vh: th.Tensor,  # noqa: N803
     output_idx: int,
     save_path: Path,
+    num_components: int = 5,
     title: str | None = None,
 ):
-    """Plot top eigenvector components.
+    """Plot top singular vector components.
 
     Args:
-        eigenvectors: Matrix of eigenvectors (d_in, k)
-        eigenvalues: Vector of eigenvalues (k,)
+        U: Left singular vectors of shape (m, m)
+        S: Singular values of shape (min(m, n),)
+        Vh: Right singular vectors of shape (n, n)
         output_idx: Output class index
         save_path: Path to save the figure
+        num_components: Number of top components to plot
         title: Optional custom title
     """
-    eigenvectors_np = eigenvectors.detach().cpu().numpy()
-    eigenvalues_np = eigenvalues.detach().cpu().numpy()
+    U_np = U.detach().cpu().numpy()  # noqa: N806
+    S_np = S.detach().cpu().numpy()  # noqa: N806
+    Vh_np = Vh.detach().cpu().numpy()  # noqa: N806
 
-    k = eigenvectors_np.shape[1]
+    k = min(num_components, len(S_np))
 
-    fig, axes = plt.subplots(k, 1, figsize=(12, 3 * k))
+    fig, axes = plt.subplots(2, k, figsize=(4 * k, 8))
     if k == 1:
-        axes = [axes]
+        axes = axes.reshape(2, 1)
 
-    for i, (ax, eigval) in enumerate(zip(axes, eigenvalues_np, strict=True)):
-        eigvec = eigenvectors_np[:, i]
+    for i in range(k):
+        # Plot left singular vector (U)
+        ax_u = axes[0, i]
+        u_vec = U_np[:, i]
+        ax_u.bar(range(len(u_vec)), u_vec)
+        ax_u.set_title(f"U[{i}] (σ = {S_np[i]:.3f})")
+        ax_u.set_xlabel("Component Index")
+        ax_u.set_ylabel("Value")
+        ax_u.grid(True, alpha=0.3)
 
-        ax.plot(eigvec.real, label="Real", linewidth=2, alpha=0.8)
-        ax.plot(eigvec.imag, label="Imaginary", linewidth=2, alpha=0.8)
-
-        ax.set_xlabel("Component Index", fontsize=11)
-        ax.set_ylabel("Value", fontsize=11)
-        ax.set_title(
-            f"Eigenvector {i + 1} (λ = {eigval.real:.3f} + {eigval.imag:.3f}i)",
-            fontsize=12,
-        )
-        ax.legend()
-        ax.grid(True, alpha=0.3)
+        # Plot right singular vector (Vh)
+        ax_v = axes[1, i]
+        v_vec = Vh_np[i, :]
+        ax_v.bar(range(len(v_vec)), v_vec)
+        ax_v.set_title(f"V[{i}]")
+        ax_v.set_xlabel("Component Index")
+        ax_v.set_ylabel("Value")
+        ax_v.grid(True, alpha=0.3)
 
     if title is None:
-        title = f"Top {k} Eigenvector Components for Output Class {output_idx}"
+        title = f"Top {k} Singular Vectors for Output Class {output_idx}"
     fig.suptitle(title, fontsize=14, y=1.0)
 
     plt.tight_layout()
     plt.savefig(save_path, dpi=300, bbox_inches="tight")
     plt.close()
 
-    logger.info(f"Saved eigenvector components plot to {save_path}")
+    logger.info(f"Saved singular vector plot to {save_path}")
 
 
 @arguably.command
@@ -220,16 +129,16 @@ def visualize(
     *,
     output_indices: list[int] | None = None,
     mod_basis: int = 113,
-    num_eigenvectors: int = 5,
+    num_components: int = 5,
     output_dir: str = "fig",
 ):
-    """Visualize interaction matrices and eigenvector components from a trained bilinear model.
+    """Visualize interaction matrices and singular vector components from a trained bilinear model.
 
     Args:
         checkpoint_path: Path to the model checkpoint file
         output_indices: List of output indices to visualize (default: [0, 1, mod_basis-1])
         mod_basis: Modular basis (P) used in training
-        num_eigenvectors: Number of top eigenvectors to compute and plot
+        num_components: Number of top singular vector components to plot
         output_dir: Directory to save figures
     """
     # Setup
@@ -244,8 +153,20 @@ def visualize(
     logger.info(f"Visualizing interaction matrices for output indices: {output_indices}")
 
     # Load checkpoint
-    checkpoint = load_checkpoint(checkpoint_path_obj)
-    bilinear_weights = extract_bilinear_weights(checkpoint)
+    logger.info(f"Loading checkpoint from {checkpoint_path_obj}")
+    checkpoint = th.load(checkpoint_path_obj, map_location="cpu", weights_only=False)
+    logger.info("Checkpoint loaded successfully")
+
+    # TODO: Extract bilinear weights from model
+    # Once the model is defined, load state dict into the model and extract the bilinear layer weights
+    # For now, assume weights are directly in checkpoint or at a known key
+    if "bilinear_weights" in checkpoint:
+        bilinear_weights = checkpoint["bilinear_weights"]
+    else:
+        raise ValueError(
+            "Checkpoint structure not yet supported. "
+            "Need to implement model loading once nn.Module is defined."
+        )
 
     d_out, d_in_0, d_in_1 = bilinear_weights.shape
     logger.info(f"Bilinear weights shape: (d_out={d_out}, d_in_0={d_in_0}, d_in_1={d_in_1})")
@@ -262,18 +183,19 @@ def visualize(
         output_vec = th.zeros(d_out)
         output_vec[out_idx] = 1.0
 
-        # Compute interaction matrix
-        interaction = compute_interaction_matrix(bilinear_weights, output_vec)
+        # Interaction matrix is the tensor product along the output dimension
+        interaction = th.einsum("ijk,i->jk", bilinear_weights, output_vec)
 
         # Plot interaction matrix
         matrix_path = output_dir_obj / f"interaction_matrix_output_{out_idx}.png"
         plot_interaction_matrix(interaction, out_idx, matrix_path)
 
-        # Compute and plot eigenvector components
-        eigenvalues, eigenvectors = compute_top_eigenvectors(interaction, k=num_eigenvectors)
+        # Compute SVD
+        U, S, Vh = th.linalg.svd(interaction, full_matrices=False)  # noqa: N806
 
-        eigvec_path = output_dir_obj / f"eigenvectors_output_{out_idx}.png"
-        plot_eigenvector_components(eigenvectors, eigenvalues, out_idx, eigvec_path)
+        # Plot singular vectors
+        svd_path = output_dir_obj / f"singular_vectors_output_{out_idx}.png"
+        plot_singular_vectors(U, S, Vh, out_idx, svd_path, num_components=num_components)
 
     logger.success(f"Visualization complete! Figures saved to {output_dir_obj}")
 
