@@ -162,7 +162,7 @@ requires-dist = [
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.8.0" },
     { name = "torch", specifier = ">=2.0.0" },
     { name = "tqdm", specifier = ">=4.65.0" },
-    { name = "trackio", specifier = ">=0.1.0" },
+    { name = "trackio", specifier = ">=0.7.0" },
 ]
 provides-extras = ["dev"]
 

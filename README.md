@@ -89,6 +89,30 @@ All jobs run on Python 3.13.
 
 ## Usage
 
+### Training
+
+Dataset generation and model training code is located in the `core/` directory (work in progress).
+
+### Visualization
+
+Once you have a trained model checkpoint, you can visualize the interaction matrices:
+
+```bash
+# Visualize with default settings (output indices 0, 1, 112 for mod 113)
+uv run python -m bilinear_modular.viz.interaction_matrices visualize checkpoints/model_epoch_2000.pt
+
+# Visualize specific output classes
+uv run python -m bilinear_modular.viz.interaction_matrices visualize checkpoints/model_epoch_2000.pt --output-indices 0 5 10 50 112
+
+# Change number of eigenvectors to plot
+uv run python -m bilinear_modular.viz.interaction_matrices visualize checkpoints/model_epoch_2000.pt --num-eigenvectors 10
+
+# Save to a different directory
+uv run python -m bilinear_modular.viz.interaction_matrices visualize checkpoints/model_epoch_2000.pt --output-dir figures/experiment_1
+```
+
+See [src/bilinear_modular/viz/README.md](src/bilinear_modular/viz/README.md) for detailed documentation on the visualization module.
+
 ### Dataset Generation
 
 Generate a modular arithmetic dataset for a given modulus:
@@ -142,11 +166,16 @@ For a complete example, see `examples/generate_dataset_example.py`.
 │   └── bilinear_modular/     # Main package
 │       ├── __init__.py
 │       └── core/
+│       │   ├── __init__.py
+│       │   └── dataset.py     # Dataset generation and loading
+│       └── viz/               # Visualization tools
 │           ├── __init__.py
-│           └── dataset.py     # Dataset generation and loading
+│           ├── interaction_matrices.py
+│           └── README.md
+├── fig/                       # Output directory for figures
 ├── tests/                     # Test files
 │   ├── test_placeholder.py
-│   └── test_dataset.py        # Dataset tests
+│   └── test_visualization.py
 ├── examples/                  # Example scripts
 │   └── generate_dataset_example.py
 ├── data/                      # Generated datasets (gitignored)

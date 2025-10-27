@@ -1,4 +1,4 @@
-"""Visualization tools for bilinear layers."""
+"""Visualization module for bilinear modular arithmetic."""
 
 from .eigenvectors import (
     load_eigendecomp_results,
