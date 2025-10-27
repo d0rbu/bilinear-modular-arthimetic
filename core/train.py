@@ -2,7 +2,6 @@
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
 import arguably
 import torch as th
@@ -10,6 +9,8 @@ import torch.nn as nn
 from loguru import logger
 from tqdm import tqdm
 import trackio
+
+from src.bilinear_modular.core.dataset import ModularArithmeticDataset, generate_dataset
 
 
 @dataclass
@@ -42,7 +43,7 @@ class BilinearModularModel(nn.Module):
         self.input_dim = input_dim  # type: ignore[misc]
         self.hidden_dim = hidden_dim  # type: ignore[misc]
         self.output_dim = output_dim  # type: ignore[misc]
-        self.use_output_projection = use_output_projection
+        self.use_output_projection = use_output_projection  # type: ignore[misc]
 
         # Bilinear layer: combines two inputs via learned interaction
         self.bilinear = nn.Bilinear(input_dim, input_dim, hidden_dim, bias=True)
@@ -51,7 +52,7 @@ class BilinearModularModel(nn.Module):
         if use_output_projection:
             self.output = nn.Linear(hidden_dim, output_dim)
         else:
-            self.output = None
+            self.output = None  # type: ignore[misc]
 
     def forward(self, a: th.Tensor, b: th.Tensor) -> th.Tensor:
         """Forward pass.
@@ -67,7 +68,7 @@ class BilinearModularModel(nn.Module):
         hidden = self.bilinear(a, b)
 
         # Project to output if using output projection
-        logits = self.output(hidden) if self.use_output_projection else hidden
+        logits = self.output(hidden) if self.use_output_projection else hidden  # type: ignore[misc]
 
         return logits
 
@@ -123,7 +124,7 @@ def train_epoch(
     model: nn.Module,
     optimizer: th.optim.Optimizer,
     criterion: nn.Module,
-    train_loader: Any,  # TODO: Replace with actual dataloader type
+    dataset: ModularArithmeticDataset,
     device: str,
     grad_accum_steps: int,
     tracker: trackio.Run,
@@ -135,7 +136,7 @@ def train_epoch(
         model: The model to train
         optimizer: Optimizer
         criterion: Loss function
-        train_loader: Training data loader (TODO: implement in parallel)
+        dataset: Training dataset
         device: Device to train on
         grad_accum_steps: Number of gradient accumulation steps
         tracker: Trackio tracker for logging
@@ -148,13 +149,18 @@ def train_epoch(
     total_loss = 0.0
     num_batches = 0
 
-    # TODO: Once dataset is ready, replace this with actual data loading
-    # For now, this is a placeholder structure
-    pbar = tqdm(train_loader, desc=f"Epoch {epoch}", leave=False)
+    pbar = tqdm(dataset.train(), desc=f"Epoch {epoch}", leave=False)
 
     optimizer.zero_grad()
 
-    for batch_idx, (a, b, targets) in enumerate(pbar):
+    for batch_idx, (inputs, targets) in enumerate(pbar):
+        # Split concatenated inputs back into a and b
+        # inputs shape: (batch_size, 2 * mod_basis)
+        # Split into two (batch_size, mod_basis) tensors
+        mod_basis = inputs.shape[1] // 2
+        a = inputs[:, :mod_basis]
+        b = inputs[:, mod_basis:]
+
         # Move to device
         a = a.to(device)
         b = b.to(device)
@@ -185,7 +191,7 @@ def train_epoch(
         tracker.log(
             {
                 "train/batch_loss": loss.item() * grad_accum_steps,
-                "train/step": epoch * len(train_loader) + batch_idx,
+                "train/step": epoch * (dataset.train_size // dataset.batch_size) + batch_idx,
             }
         )
 
@@ -195,7 +201,7 @@ def train_epoch(
 def validate(
     model: nn.Module,
     criterion: nn.Module,
-    val_loader: Any,  # TODO: Replace with actual dataloader type
+    dataset: ModularArithmeticDataset,
     device: str,
 ) -> tuple[float, float]:
     """Validate the model.
@@ -203,7 +209,7 @@ def validate(
     Args:
         model: The model to validate
         criterion: Loss function
-        val_loader: Validation data loader (TODO: implement in parallel)
+        dataset: Validation dataset
         device: Device to validate on
 
     Returns:
@@ -213,10 +219,15 @@ def validate(
     total_loss = 0.0
     correct = 0
     total = 0
+    num_batches = 0
 
-    # TODO: Once dataset is ready, replace this with actual data loading
     with th.no_grad():
-        for a, b, targets in tqdm(val_loader, desc="Validating", leave=False):
+        for inputs, targets in tqdm(dataset.eval(), desc="Validating", leave=False):
+            # Split concatenated inputs back into a and b
+            mod_basis = inputs.shape[1] // 2
+            a = inputs[:, :mod_basis]
+            b = inputs[:, mod_basis:]
+
             # Move to device
             a = a.to(device)
             b = b.to(device)
@@ -228,12 +239,14 @@ def validate(
 
             # Calculate accuracy
             predictions = th.argmax(logits, dim=1)
-            correct += (predictions == targets).sum().item()
+            targets_class = th.argmax(targets, dim=1)  # Convert one-hot to class indices
+            correct += (predictions == targets_class).sum().item()
             total += targets.size(0)
 
             total_loss += loss.item()
+            num_batches += 1
 
-    avg_loss = total_loss / len(val_loader)
+    avg_loss = total_loss / num_batches
     accuracy = correct / total
 
     return avg_loss, accuracy
@@ -323,7 +336,7 @@ def train(
     )
 
     # Loss function
-    nn.CrossEntropyLoss()
+    criterion = nn.CrossEntropyLoss()
 
     # Load checkpoint if resuming
     start_epoch = 0
@@ -334,48 +347,51 @@ def train(
     tracker = trackio.init(project="bilinear-modular-arithmetic")
     tracker.log({"config": config})
 
-    # TODO: Set up data loaders
-    # This will be implemented by the parallel agent
-    # Expected interface:
-    # train_loader, val_loader = load_data(mod_basis, batch_size)
-    logger.warning("TODO: Data loading not implemented yet - waiting on parallel agent")
-    logger.warning("Expected interface: train_loader, val_loader = load_data(mod_basis, batch_size)")
+    # Set up dataset - generate if it doesn't exist
+    data_dir = Path(f"data/{mod_basis}")
+    if not (data_dir / "metadata.json").exists():
+        logger.info(f"Dataset not found, generating for mod {mod_basis}...")
+        generate_dataset(mod_basis)
 
-    # Placeholder for data loaders
+    # Load dataset
+    logger.info(f"Loading dataset from {data_dir}")
+    dataset = ModularArithmeticDataset(
+        mod_basis=mod_basis,
+        data_dir=data_dir,
+        train_split=0.8,
+        one_hot=True,
+        seed=seed,
+        batch_size=batch_size,
+    )
+    logger.info(f"Dataset loaded: {dataset.train_size} train, {dataset.val_size} val samples")
 
     # Training loop
     logger.info(f"Starting training on device: {device}")
 
     for epoch in range(start_epoch, epochs):
-        # TODO: Uncomment once data is ready
-        # train_loss = train_epoch(
-        #     model, optimizer, criterion, train_loader, device, grad_accum_steps, tracker, epoch
-        # )
+        train_loss = train_epoch(model, optimizer, criterion, dataset, device, grad_accum_steps, tracker, epoch)
 
-        # TODO: Uncomment once data is ready
-        # val_loss, val_accuracy = validate(model, criterion, val_loader, device)
+        val_loss, val_accuracy = validate(model, criterion, dataset, device)
 
-        # logger.info(
-        #     f"Epoch {epoch}/{epochs} - "
-        #     f"Train Loss: {train_loss:.4f} - "
-        #     f"Val Loss: {val_loss:.4f} - "
-        #     f"Val Accuracy: {val_accuracy:.4f}"
-        # )
+        logger.info(
+            f"Epoch {epoch}/{epochs} - "
+            f"Train Loss: {train_loss:.4f} - "
+            f"Val Loss: {val_loss:.4f} - "
+            f"Val Accuracy: {val_accuracy:.4f}"
+        )
 
-        # tracker.log(
-        #     {
-        #         "train/epoch_loss": train_loss,
-        #         "val/loss": val_loss,
-        #         "val/accuracy": val_accuracy,
-        #         "epoch": epoch,
-        #     }
-        # )
+        tracker.log(
+            {
+                "train/epoch_loss": train_loss,
+                "val/loss": val_loss,
+                "val/accuracy": val_accuracy,
+                "epoch": epoch,
+            }
+        )
 
         # Save checkpoint
         if (epoch + 1) % checkpoint_every == 0:
-            # TODO: Uncomment once training is ready
-            # save_checkpoint(model, optimizer, epoch, train_loss, checkpoint_path, config)
-            pass
+            save_checkpoint(model, optimizer, epoch, train_loss, checkpoint_path, config)
 
     logger.info("Training complete!")
     tracker.finish()
