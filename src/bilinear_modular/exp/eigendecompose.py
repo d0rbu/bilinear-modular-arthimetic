@@ -14,6 +14,21 @@ from loguru import logger
 from ..core.train import BilinearModularModel
 
 
+def _remove_compiled_prefix(state_dict: dict) -> dict:
+    """Remove '_orig_mod.' prefix from state dict keys if present.
+
+    This handles models that were saved after being compiled with th.compile().
+    """
+    new_state_dict = {}
+    for key, value in state_dict.items():
+        if key.startswith("_orig_mod."):
+            new_key = key[len("_orig_mod.") :]
+            new_state_dict[new_key] = value
+        else:
+            new_state_dict[key] = value
+    return new_state_dict
+
+
 @arguably.command
 def eigendecompose(
     checkpoint_path: str,
@@ -57,7 +72,8 @@ def eigendecompose(
 
     # Create model and load state dict
     model = BilinearModularModel(input_dim, hidden_dim, output_dim, use_output_projection)
-    model.load_state_dict(checkpoint["model_state_dict"])
+    state_dict = _remove_compiled_prefix(checkpoint["model_state_dict"])
+    model.load_state_dict(state_dict)
     model.eval()
 
     # Extract bilinear weights using model method
