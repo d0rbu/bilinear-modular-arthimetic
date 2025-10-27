@@ -209,5 +209,5 @@ __marimo__/
 # Project-specific
 checkpoints*/
 data/
-fig/*.png
+fig/
 exp/
