@@ -7,9 +7,9 @@ from typing import Any
 import arguably
 import torch as th
 import torch.nn as nn
+import trackio
 from loguru import logger
 from tqdm import tqdm
-import trackio
 
 
 @dataclass
