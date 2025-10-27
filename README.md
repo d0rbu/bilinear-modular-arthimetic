@@ -87,15 +87,61 @@ GitHub Actions automatically runs the following checks on every push and pull re
 
 All jobs run on Python 3.13.
 
+## Usage
+
+### Dataset Generation
+
+Generate a modular arithmetic dataset for a given modulus:
+
+```python
+from bilinear_modular import generate_dataset, ModularArithmeticDataset
+
+# Generate dataset for mod 113 (creates all a+b combinations)
+dataset = generate_dataset(mod_basis=113)
+
+# Dataset info
+print(f"Total samples: {len(dataset)}")  # 113 * 113 = 12769
+print(f"Training samples: {dataset.train_size}")  # 80% = 10215
+print(f"Validation samples: {dataset.val_size}")  # 20% = 2554
+
+# Get training batches
+inputs, targets = dataset.get_train_batch(batch_size=128, as_torch=True)
+# inputs: (128, 226) - one-hot encoded [a, b]
+# targets: (128, 113) - one-hot encoded c where c = (a + b) % 113
+
+# Get all training data
+all_train_inputs, all_train_targets = dataset.get_all_train(as_torch=True)
+
+# Load existing dataset
+dataset = ModularArithmeticDataset(mod_basis=113)
+```
+
+For a complete example, see `examples/generate_dataset_example.py`.
+
+### Dataset Features
+
+- **Automatic caching**: Datasets are saved to `data/{mod_basis}/` for reuse
+- **One-hot encoding**: Optional one-hot encoding of inputs and outputs
+- **Efficient batching**: Simple API for getting training/validation batches
+- **PyTorch integration**: Convert to PyTorch tensors with `as_torch=True`
+- **Reproducible splits**: Consistent 80/20 train/val split with fixed seed
+
 ## Project Structure
 
 ```
 .
 ├── src/
 │   └── bilinear_modular/     # Main package
-│       └── __init__.py
+│       ├── __init__.py
+│       └── core/
+│           ├── __init__.py
+│           └── dataset.py     # Dataset generation and loading
 ├── tests/                     # Test files
-│   └── test_placeholder.py
+│   ├── test_placeholder.py
+│   └── test_dataset.py        # Dataset tests
+├── examples/                  # Example scripts
+│   └── generate_dataset_example.py
+├── data/                      # Generated datasets (gitignored)
 ├── .github/
 │   └── workflows/
 │       └── ci.yml            # GitHub Actions CI

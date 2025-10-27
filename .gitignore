@@ -208,4 +208,5 @@ __marimo__/
 
 # Project-specific
 checkpoints/
-data/
+visualizations/
+data/  # Generated datasets
