@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 
 import arguably
-import torch
+import torch as th
 from loguru import logger
 
 
@@ -52,15 +52,15 @@ class ModularArithmeticDataset:
 
         # Load raw data as torch tensors
         data_path = self.data_dir / "samples.pt"
-        data = torch.load(data_path, weights_only=True)
+        data = th.load(data_path, weights_only=True)
         self.a_values = data["a"]
         self.b_values = data["b"]
         self.c_values = data["c"]
 
         # Create train/val split
-        generator = torch.Generator().manual_seed(seed)
+        generator = th.Generator().manual_seed(seed)
         n_samples = len(self.a_values)
-        indices = torch.randperm(n_samples, generator=generator)
+        indices = th.randperm(n_samples, generator=generator)
 
         split_idx = int(n_samples * train_split)
         self.train_indices = indices[:split_idx]
@@ -75,11 +75,11 @@ class ModularArithmeticDataset:
         """Total number of samples."""
         return len(self.a_values)
 
-    def _to_one_hot(self, values: torch.Tensor) -> torch.Tensor:
+    def _to_one_hot(self, values: th.Tensor) -> th.Tensor:
         """Convert integer values to one-hot encoding."""
-        return torch.nn.functional.one_hot(values.long(), num_classes=self.mod_basis).float()
+        return th.nn.functional.one_hot(values.long(), num_classes=self.mod_basis).float()
 
-    def get_batch(self, indices: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+    def get_batch(self, indices: th.Tensor) -> tuple[th.Tensor, th.Tensor]:
         """Get a batch of samples by indices.
 
         Args:
@@ -98,16 +98,16 @@ class ModularArithmeticDataset:
             # Concatenate one-hot encoded a and b
             a_one_hot = self._to_one_hot(a_batch)
             b_one_hot = self._to_one_hot(b_batch)
-            inputs = torch.cat([a_one_hot, b_one_hot], dim=1)
+            inputs = th.cat([a_one_hot, b_one_hot], dim=1)
             targets = self._to_one_hot(c_batch)
         else:
             # Return raw integers
-            inputs = torch.stack([a_batch, b_batch], dim=1)
+            inputs = th.stack([a_batch, b_batch], dim=1)
             targets = c_batch
 
         return inputs, targets
 
-    def get_train_batch(self, batch_size: int | None = None) -> tuple[torch.Tensor, torch.Tensor]:
+    def get_train_batch(self, batch_size: int | None = None) -> tuple[th.Tensor, th.Tensor]:
         """Get a random batch from training set.
 
         Args:
@@ -118,10 +118,10 @@ class ModularArithmeticDataset:
         """
         if batch_size is None:
             batch_size = self.batch_size
-        indices = self.train_indices[torch.randint(0, len(self.train_indices), (batch_size,))]
+        indices = self.train_indices[th.randint(0, len(self.train_indices), (batch_size,))]
         return self.get_batch(indices)
 
-    def get_val_batch(self, batch_size: int | None = None) -> tuple[torch.Tensor, torch.Tensor]:
+    def get_val_batch(self, batch_size: int | None = None) -> tuple[th.Tensor, th.Tensor]:
         """Get a random batch from validation set.
 
         Args:
@@ -132,10 +132,10 @@ class ModularArithmeticDataset:
         """
         if batch_size is None:
             batch_size = self.batch_size
-        indices = self.val_indices[torch.randint(0, len(self.val_indices), (batch_size,))]
+        indices = self.val_indices[th.randint(0, len(self.val_indices), (batch_size,))]
         return self.get_batch(indices)
 
-    def get_all_train(self) -> tuple[torch.Tensor, torch.Tensor]:
+    def get_all_train(self) -> tuple[th.Tensor, th.Tensor]:
         """Get all training samples.
 
         Returns:
@@ -143,7 +143,7 @@ class ModularArithmeticDataset:
         """
         return self.get_batch(self.train_indices)
 
-    def get_all_val(self) -> tuple[torch.Tensor, torch.Tensor]:
+    def get_all_val(self) -> tuple[th.Tensor, th.Tensor]:
         """Get all validation samples.
 
         Returns:
@@ -175,8 +175,8 @@ class ModularArithmeticDataset:
         """Initialize iterator for epoch."""
         # Shuffle training indices at the start of each epoch
         if self._is_training:
-            generator = torch.Generator().manual_seed(self.seed + torch.randint(0, 10000, (1,)).item())
-            perm = torch.randperm(len(self.train_indices), generator=generator)
+            generator = th.Generator().manual_seed(self.seed + th.randint(0, 10000, (1,)).item())
+            perm = th.randperm(len(self.train_indices), generator=generator)
             self._current_epoch_indices = self.train_indices[perm]
         else:
             self._current_epoch_indices = self.val_indices
@@ -184,7 +184,7 @@ class ModularArithmeticDataset:
         self._current_idx = 0
         return self
 
-    def __next__(self) -> tuple[torch.Tensor, torch.Tensor]:
+    def __next__(self) -> tuple[th.Tensor, th.Tensor]:
         """Get next batch in iteration."""
         if self._current_epoch_indices is None:
             raise RuntimeError("Iterator not initialized. Call iter(dataset) first.")
@@ -233,11 +233,11 @@ def generate_dataset(
     logger.info(f"Generating modular arithmetic dataset for mod {mod_basis}...")
 
     # Generate all combinations efficiently using torch
-    a_range = torch.arange(mod_basis, dtype=torch.long)
-    b_range = torch.arange(mod_basis, dtype=torch.long)
+    a_range = th.arange(mod_basis, dtype=th.long)
+    b_range = th.arange(mod_basis, dtype=th.long)
 
     # Create meshgrid for all combinations
-    a_values, b_values = torch.meshgrid(a_range, b_range, indexing="ij")
+    a_values, b_values = th.meshgrid(a_range, b_range, indexing="ij")
     a_values = a_values.flatten()
     b_values = b_values.flatten()
 
@@ -246,7 +246,7 @@ def generate_dataset(
 
     # Save to disk as .pt file
     samples_path = output_path / "samples.pt"
-    torch.save(
+    th.save(
         {
             "a": a_values,
             "b": b_values,
