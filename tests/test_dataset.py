@@ -4,7 +4,7 @@ import shutil
 from pathlib import Path
 
 import pytest
-import torch
+import torch as th
 
 from bilinear_modular.core import ModularArithmeticDataset, generate_dataset
 
@@ -66,15 +66,15 @@ def test_one_hot_encoding(cleanup_test_data):
     dataset = generate_dataset(mod_basis)
 
     # Get a batch with one-hot encoding
-    inputs, targets = dataset.get_batch(torch.tensor([0, 1, 2]))
+    inputs, targets = dataset.get_batch(th.tensor([0, 1, 2]))
 
     # Check shapes
     assert inputs.shape == (3, 2 * mod_basis)
     assert targets.shape == (3, mod_basis)
 
     # Check one-hot properties
-    assert torch.all(inputs.sum(dim=1) == 2)  # Two 1s per sample (one for a, one for b)
-    assert torch.all(targets.sum(dim=1) == 1)  # One 1 per target
+    assert th.all(inputs.sum(dim=1) == 2)  # Two 1s per sample (one for a, one for b)
+    assert th.all(targets.sum(dim=1) == 1)  # One 1 per target
 
 
 def test_raw_integer_mode(cleanup_test_data):
@@ -84,15 +84,15 @@ def test_raw_integer_mode(cleanup_test_data):
     dataset = ModularArithmeticDataset(mod_basis, one_hot=False)
 
     # Get a batch without one-hot encoding
-    inputs, targets = dataset.get_batch(torch.tensor([0, 1, 2]))
+    inputs, targets = dataset.get_batch(th.tensor([0, 1, 2]))
 
     # Check shapes
     assert inputs.shape == (3, 2)  # Just a and b
     assert targets.shape == (3,)  # Just c
 
     # Check values are integers
-    assert inputs.dtype == torch.long
-    assert targets.dtype == torch.long
+    assert inputs.dtype == th.long
+    assert targets.dtype == th.long
 
 
 def test_train_val_split(cleanup_test_data):
@@ -143,10 +143,10 @@ def test_torch_tensors(cleanup_test_data):
     dataset = generate_dataset(mod_basis)
 
     # Get batch
-    inputs, targets = dataset.get_batch(torch.tensor([0, 1, 2]))
+    inputs, targets = dataset.get_batch(th.tensor([0, 1, 2]))
 
-    assert isinstance(inputs, torch.Tensor)
-    assert isinstance(targets, torch.Tensor)
+    assert isinstance(inputs, th.Tensor)
+    assert isinstance(targets, th.Tensor)
     assert inputs.shape == (3, 2 * mod_basis)
     assert targets.shape == (3, mod_basis)
 
@@ -164,9 +164,9 @@ def test_dataset_reload(cleanup_test_data):
     # Check they're equivalent
     assert dataset1.mod_basis == dataset2.mod_basis
     assert len(dataset1) == len(dataset2)
-    assert torch.equal(dataset1.a_values, dataset2.a_values)
-    assert torch.equal(dataset1.b_values, dataset2.b_values)
-    assert torch.equal(dataset1.c_values, dataset2.c_values)
+    assert th.equal(dataset1.a_values, dataset2.a_values)
+    assert th.equal(dataset1.b_values, dataset2.b_values)
+    assert th.equal(dataset1.c_values, dataset2.c_values)
 
 
 def test_missing_dataset_error():
@@ -191,8 +191,8 @@ def test_iterator_protocol(cleanup_test_data):
 
     assert len(batches) == 3
     for inputs, targets in batches:
-        assert isinstance(inputs, torch.Tensor)
-        assert isinstance(targets, torch.Tensor)
+        assert isinstance(inputs, th.Tensor)
+        assert isinstance(targets, th.Tensor)
         assert inputs.shape[0] <= 5  # Batch size
         assert targets.shape[0] <= 5
 
