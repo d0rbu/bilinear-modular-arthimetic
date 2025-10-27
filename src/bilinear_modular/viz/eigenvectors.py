@@ -19,35 +19,34 @@ from loguru import logger
 matplotlib.use("Agg")
 
 
-def load_eigendecomp_results(eigendecomp_dir: Path, output_idx: int) -> dict:
+def load_svd_results(eigendecomp_dir: Path) -> dict:
     """
-    Load eigendecomposition results for a specific output direction.
+    Load SVD results from eigendecomposition.
 
     Args:
         eigendecomp_dir: Directory containing eigendecomposition results
-        output_idx: Index of the output direction
 
     Returns:
-        Dictionary with eigenvalues, eigenvectors, and metadata
+        Dictionary with U, S, Vh matrices and shape metadata
     """
-    result_file = eigendecomp_dir / f"output_{output_idx}.pt"
+    result_file = eigendecomp_dir / "svd_results.pt"
     if not result_file.exists():
-        raise FileNotFoundError(f"Eigendecomposition results not found: {result_file}")
+        raise FileNotFoundError(f"SVD results not found: {result_file}")
 
-    logger.info(f"Loading eigendecomposition results from {result_file}")
+    logger.info(f"Loading SVD results from {result_file}")
     results = th.load(result_file, map_location="cpu", weights_only=False)
     return results
 
 
-def load_summary(eigendecomp_dir: Path) -> dict:
-    """Load summary metadata from eigendecomposition."""
-    summary_file = eigendecomp_dir / "summary.json"
-    if not summary_file.exists():
-        raise FileNotFoundError(f"Summary file not found: {summary_file}")
+def load_metadata(eigendecomp_dir: Path) -> dict:
+    """Load metadata from eigendecomposition."""
+    metadata_file = eigendecomp_dir / "metadata.json"
+    if not metadata_file.exists():
+        raise FileNotFoundError(f"Metadata file not found: {metadata_file}")
 
-    with open(summary_file) as f:
-        summary = json.load(f)
-    return summary
+    with open(metadata_file) as f:
+        metadata = json.load(f)
+    return metadata
 
 
 def plot_eigenvector_components(
@@ -259,108 +258,136 @@ def plot_eigenvector_2d_structure(
 @arguably.command
 def visualize_eigenvectors(
     eigendecomp_dir: str,
-    mod_basis: int = 113,
-    output_indices: list[int] | None = None,
     n_top: int = 5,
     fig_dir: str = "fig/eigenvectors",
 ):
     """
-    Visualize eigenvectors from eigendecomposition results.
+    Visualize eigenvectors from SVD eigendecomposition results.
 
     Args:
-        eigendecomp_dir: Directory containing eigendecomposition results
-        mod_basis: The modular arithmetic basis (default: 113)
-        output_indices: List of output indices to visualize. If None, visualizes all available.
-        n_top: Number of top eigenvectors to visualize per output
+        eigendecomp_dir: Directory containing SVD results (svd_results.pt and metadata.json)
+        n_top: Number of top singular vectors to visualize
         fig_dir: Directory to save figures
     """
-    logger.info("Starting eigenvector visualization")
+    logger.info("Starting SVD eigenvector visualization")
     logger.info(f"Eigendecomp dir: {eigendecomp_dir}")
-    logger.info(f"Mod basis: {mod_basis}, Top-{n_top} eigenvectors")
+    logger.info(f"Top-{n_top} components")
 
-    eigendecomp_path = Path(eigendecomp_dir) / f"mod_{mod_basis}"
+    eigendecomp_path = Path(eigendecomp_dir)
     if not eigendecomp_path.exists():
         raise FileNotFoundError(f"Eigendecomposition directory not found: {eigendecomp_path}")
 
-    # Load summary
-    summary = load_summary(eigendecomp_path)
-    logger.info(f"Loaded summary: {summary['bilinear_shape']}")
+    # Load SVD results and metadata
+    results = load_svd_results(eigendecomp_path)
+    metadata = load_metadata(eigendecomp_path)
 
-    # Determine which outputs to visualize
-    if output_indices is None:
-        output_indices = summary["output_indices"]
+    logger.info(f"Loaded metadata: {metadata['bilinear_shape']}")
+    logger.info(f"Top-k components in results: {metadata['top_k']}")
+
+    # Extract SVD components
+    U = results["U"]  # Output directions (d_out, top_k)  # noqa: N806
+    S = results["S"]  # Singular values (top_k,)  # noqa: N806
+    Vh = results["Vh"]  # Input interaction matrices (top_k, d_in_0 * d_in_1)  # noqa: N806
+    shape = results["shape"]
+
+    d_out, d_in_0, d_in_1 = shape["d_out"], shape["d_in_0"], shape["d_in_1"]
+
+    logger.info(f"Bilinear shape: ({d_out}, {d_in_0}, {d_in_1})")
+    logger.info(f"Singular values: {S.tolist()}")
 
     # Create output directory
-    fig_path = Path(fig_dir) / f"mod_{mod_basis}"
+    fig_path = Path(fig_dir)
     fig_path.mkdir(parents=True, exist_ok=True)
 
-    # Visualize each output direction
-    for output_idx in output_indices:
-        logger.info(f"Visualizing output direction {output_idx}")
+    # Limit n_top to available components
+    n_top = min(n_top, S.shape[0])
 
-        try:
-            results = load_eigendecomp_results(eigendecomp_path, output_idx)
-        except FileNotFoundError:
-            logger.warning(f"No results found for output {output_idx}, skipping")
-            continue
+    # 1. Plot singular value spectrum
+    fig = plot_eigenvalue_spectrum(
+        S,
+        title="Singular Value Spectrum",
+    )
+    fig.savefig(fig_path / "singular_value_spectrum.png", dpi=150, bbox_inches="tight")
+    plt.close(fig)
+    logger.debug("Saved singular value spectrum")
 
-        eigenvectors = results["eigenvectors"]  # Shape: (d_in, n_eigenvectors)
-        eigenvalues = results["eigenvalues"]
+    # 2. Visualize input interaction matrices (right singular vectors Vh)
+    # These represent the most important input interaction patterns
+    for i in range(n_top):
+        singular_value = S[i].item()
+        input_vector = Vh[i, :]  # (d_in_0 * d_in_1,)
 
-        output_fig_dir = fig_path / f"output_{output_idx}"
-        output_fig_dir.mkdir(exist_ok=True)
+        # Reshape back to interaction matrix
+        interaction_matrix = input_vector.reshape(d_in_0, d_in_1)
 
-        # 1. Plot eigenvalue spectrum
-        fig = plot_eigenvalue_spectrum(
-            eigenvalues,
-            title=f"Output {output_idx}: Eigenvalue Spectrum",
-        )
-        fig.savefig(output_fig_dir / "eigenvalue_spectrum.png", dpi=150, bbox_inches="tight")
+        fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+
+        # Plot as heatmap
+        im = axes[0].imshow(interaction_matrix.numpy(), aspect="auto", cmap="RdBu_r")
+        axes[0].set_xlabel("Input 2")
+        axes[0].set_ylabel("Input 1")
+        axes[0].set_title(f"Component {i}: Interaction Matrix\nSingular value: {singular_value:.4f}")
+        plt.colorbar(im, ax=axes[0])
+
+        # Plot flattened vector
+        axes[1].plot(input_vector.numpy(), "o-", alpha=0.7, markersize=2)
+        axes[1].axhline(y=0, color="k", linestyle="-", linewidth=0.5)
+        axes[1].set_xlabel("Flattened Index")
+        axes[1].set_ylabel("Component Value")
+        axes[1].set_title("Flattened View")
+        axes[1].grid(True, alpha=0.3)
+
+        plt.tight_layout()
+        fig.savefig(fig_path / f"input_component_{i}.png", dpi=150, bbox_inches="tight")
         plt.close(fig)
-        logger.debug("Saved eigenvalue spectrum")
 
-        # 2. Plot heatmap of top eigenvectors
-        fig = plot_top_eigenvectors_heatmap(
-            eigenvectors,
-            eigenvalues,
-            n_top=n_top,
-            title=f"Output {output_idx}: Top {n_top} Eigenvectors",
-        )
-        fig.savefig(output_fig_dir / "eigenvectors_heatmap.png", dpi=150, bbox_inches="tight")
-        plt.close(fig)
-        logger.debug("Saved eigenvectors heatmap")
+    logger.debug("Saved input component visualizations")
 
-        # 3. Plot individual eigenvector components
-        for i in range(min(n_top, eigenvectors.shape[1])):
-            eigenvector = eigenvectors[:, i]
-            eigenvalue = eigenvalues[i].item()
+    # 3. Plot heatmap of top input components (Vh)
+    n_show = min(n_top, Vh.shape[0])
+    fig, ax = plt.subplots(figsize=(12, max(6, n_show * 0.5)))
 
-            fig = plot_eigenvector_components(
-                eigenvector,
-                eigenvalue,
-                i,
-                title=f"Output {output_idx}: Eigenvector {i}",
-                mod_basis=mod_basis,
-            )
-            fig.savefig(output_fig_dir / f"eigenvector_{i}_components.png", dpi=150, bbox_inches="tight")
-            plt.close(fig)
-        logger.debug("Saved individual eigenvector plots")
+    im = ax.imshow(Vh[:n_show, :].numpy(), aspect="auto", cmap="RdBu_r", interpolation="nearest")
+    cbar = plt.colorbar(im, ax=ax)
+    cbar.set_label("Component Value", rotation=270, labelpad=20)
 
-        # 4. Plot 2D structure
-        fig = plot_eigenvector_2d_structure(
-            eigenvectors,
-            eigenvalues,
-            mod_basis=mod_basis,
-            n_top=n_top,
-            title=f"Output {output_idx}: Eigenvector Structure",
-        )
-        fig.savefig(output_fig_dir / "eigenvector_structure.png", dpi=150, bbox_inches="tight")
-        plt.close(fig)
-        logger.debug("Saved eigenvector structure plot")
+    ax.set_yticks(range(n_show))
+    ax.set_yticklabels([f"#{i} (σ={S[i].item():.3f})" for i in range(n_show)])
+    ax.set_xlabel("Flattened Input Index")
+    ax.set_ylabel("Input Component")
+    ax.set_title(f"Top {n_show} Input Components (Right Singular Vectors)")
 
-        logger.info(f"✓ Completed visualizations for output {output_idx}")
+    plt.tight_layout()
+    fig.savefig(fig_path / "input_components_heatmap.png", dpi=150, bbox_inches="tight")
+    plt.close(fig)
+    logger.debug("Saved input components heatmap")
 
-    logger.info(f"Eigenvector visualization complete! Figures saved to {fig_path}")
+    # 4. Visualize output directions (left singular vectors U)
+    fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+
+    # Plot as heatmap
+    im = axes[0].imshow(U.numpy(), aspect="auto", cmap="RdBu_r")
+    axes[0].set_xlabel("Component Index")
+    axes[0].set_ylabel("Output Dimension")
+    axes[0].set_title("Output Directions (Left Singular Vectors)")
+    plt.colorbar(im, ax=axes[0])
+
+    # Plot specific output components
+    for i in range(min(5, U.shape[1])):
+        axes[1].plot(U[:, i].numpy(), "o-", label=f"Comp {i} (σ={S[i].item():.3f})", alpha=0.7, markersize=3)
+    axes[1].axhline(y=0, color="k", linestyle="-", linewidth=0.5)
+    axes[1].set_xlabel("Output Dimension")
+    axes[1].set_ylabel("Component Value")
+    axes[1].set_title("Top Output Components")
+    axes[1].legend()
+    axes[1].grid(True, alpha=0.3)
+
+    plt.tight_layout()
+    fig.savefig(fig_path / "output_directions.png", dpi=150, bbox_inches="tight")
+    plt.close(fig)
+    logger.debug("Saved output directions")
+
+    logger.info(f"SVD visualization complete! Figures saved to {fig_path}")
 
 
 if __name__ == "__main__":
