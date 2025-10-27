@@ -28,6 +28,7 @@ class TrainingConfig:
     checkpoint_every: int = 100
     device: str = "cuda" if th.cuda.is_available() else "cpu"
     compile: bool = True
+    use_output_projection: bool = False
     seed: int = 0
 
 
@@ -38,7 +39,7 @@ class BilinearModularModel(nn.Module):
     The network takes two one-hot encoded inputs and outputs logits for the result.
     """
 
-    def __init__(self, input_dim: int, hidden_dim: int, output_dim: int, use_output_projection: bool = True):
+    def __init__(self, input_dim: int, hidden_dim: int, output_dim: int, use_output_projection: bool = False):
         super().__init__()
         self.input_dim = input_dim  # type: ignore[misc]
         self.hidden_dim = hidden_dim  # type: ignore[misc]
@@ -46,13 +47,11 @@ class BilinearModularModel(nn.Module):
         self.use_output_projection = use_output_projection  # type: ignore[misc]
 
         # Bilinear layer: combines two inputs via learned interaction
-        self.bilinear = nn.Bilinear(input_dim, input_dim, hidden_dim, bias=True)
-
-        # Optional output projection
-        if use_output_projection:
-            self.output = nn.Linear(hidden_dim, output_dim)
+        if self.use_output_projection:
+            self.bilinear = nn.Bilinear(input_dim, input_dim, hidden_dim, bias=False)
+            self.output = nn.Linear(hidden_dim, output_dim, bias=False)
         else:
-            self.output = None  # type: ignore[misc]
+            self.bilinear = nn.Bilinear(input_dim, input_dim, output_dim, bias=False)
 
     def forward(self, a: th.Tensor, b: th.Tensor) -> th.Tensor:
         """Forward pass.
@@ -256,6 +255,7 @@ def validate(
 def train(
     *,
     mod_basis: int = 113,
+    use_output_projection: bool = False,
     hidden_dim: int = 100,
     batch_size: int = 128,
     learning_rate: float = 3e-3,
@@ -297,6 +297,7 @@ def train(
         learning_rate=learning_rate,
         weight_decay=weight_decay,
         epochs=epochs,
+        use_output_projection=use_output_projection,
         grad_accum_steps=grad_accum_steps,
         checkpoint_dir=checkpoint_dir,
         checkpoint_every=checkpoint_every,
@@ -320,7 +321,7 @@ def train(
     # Initialize model
     input_dim = mod_basis
     output_dim = mod_basis
-    model: nn.Module = BilinearModularModel(input_dim, hidden_dim, output_dim)
+    model: nn.Module = BilinearModularModel(input_dim, hidden_dim, output_dim, use_output_projection)
     model = model.to(device)
 
     # Compile model for speed
