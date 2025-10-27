@@ -3,6 +3,7 @@
 import arguably
 
 from bilinear_modular.core import generate_dataset as _generate_dataset
+from bilinear_modular.exp.eigendecompose import eigendecompose  # noqa: F401
 from bilinear_modular.viz.interaction_matrices import visualize as _visualize_interaction_matrices
 
 

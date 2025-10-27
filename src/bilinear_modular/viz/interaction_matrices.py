@@ -164,7 +164,7 @@ def visualize(
     output_dir_obj.mkdir(exist_ok=True, parents=True)
 
     # Default output indices if not provided
-    if output_indices is None:
+    if not output_indices:
         output_indices = [0, 1, mod_basis - 1]
 
     logger.info(f"Visualizing interaction matrices for output indices: {output_indices}")
@@ -194,24 +194,30 @@ def visualize(
 
     # Extract bilinear weights using model method
     bilinear_weights = model.get_interaction_matrices()
+    projection_weights = model.output.weight.data if model.use_output_projection else th.eye(output_dim)
 
-    d_out, d_in_0, d_in_1 = bilinear_weights.shape
-    logger.info(f"Bilinear weights shape: (d_out={d_out}, d_in_0={d_in_0}, d_in_1={d_in_1})")
+    d_out_bilinear, d_in_0, d_in_1 = bilinear_weights.shape
+    logger.info(f"Bilinear weights shape: (d_out_bilinear={d_out_bilinear}, d_in_0={d_in_0}, d_in_1={d_in_1})")
+    d_out_proj, d_hidden = projection_weights.shape
+    logger.info(f"Projection weights shape: (d_out_proj={d_out_proj}, d_hidden={d_hidden})")
 
     # Process each output index
     for out_idx in output_indices:
-        if out_idx >= d_out or out_idx < 0:
-            logger.warning(f"Output index {out_idx} out of range [0, {d_out}). Skipping.")
+        if out_idx >= d_out_proj or out_idx < 0:
+            logger.warning(f"Output index {out_idx} out of range [0, {d_out_proj}). Skipping.")
             continue
 
         logger.info(f"Processing output index {out_idx}")
 
         # Create output vector (one-hot)
-        output_vec = th.zeros(d_out)
+        output_vec = th.zeros(d_out_proj)
         output_vec[out_idx] = 1.0
 
+        # Project output vector if using output projection
+        output_vec = projection_weights.T @ output_vec.unsqueeze(1)
+
         # Interaction matrix is the tensor product along the output dimension
-        interaction = th.einsum("ijk,i->jk", bilinear_weights, output_vec)
+        interaction = th.einsum("ijk,i->jk", bilinear_weights, output_vec.squeeze())
 
         # Plot interaction matrix
         matrix_path = output_dir_obj / f"interaction_matrix_output_{out_idx}.png"
