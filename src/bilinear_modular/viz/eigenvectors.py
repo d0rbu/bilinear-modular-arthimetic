@@ -311,8 +311,17 @@ def visualize_eigenvectors(
     plt.close(fig)
     logger.debug("Saved singular value spectrum")
 
-    # 2. Visualize input interaction matrices (right singular vectors Vh)
+    # 2. Visualize all input interaction matrices side by side
     # These represent the most important input interaction patterns
+    fig, axes = plt.subplots(1, n_top, figsize=(5 * n_top, 5))
+    if n_top == 1:
+        axes = [axes]
+
+    # Find global min/max for consistent color scaling
+    all_matrices = [Vh[i, :].reshape(d_in_0, d_in_1).numpy() for i in range(n_top)]
+    vmin = min(mat.min() for mat in all_matrices)
+    vmax = max(mat.max() for mat in all_matrices)
+
     for i in range(n_top):
         singular_value = S[i].item()
         input_vector = Vh[i, :]  # (d_in_0 * d_in_1,)
@@ -320,28 +329,21 @@ def visualize_eigenvectors(
         # Reshape back to interaction matrix
         interaction_matrix = input_vector.reshape(d_in_0, d_in_1)
 
-        fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+        # Plot as heatmap with consistent color scale
+        im = axes[i].imshow(interaction_matrix.numpy(), aspect="auto", cmap="RdBu_r", vmin=vmin, vmax=vmax)
+        axes[i].set_xlabel("Input 2")
+        axes[i].set_ylabel("Input 1")
+        axes[i].set_title(f"Component {i}\nσ={singular_value:.4f}")
 
-        # Plot as heatmap
-        im = axes[0].imshow(interaction_matrix.numpy(), aspect="auto", cmap="RdBu_r")
-        axes[0].set_xlabel("Input 2")
-        axes[0].set_ylabel("Input 1")
-        axes[0].set_title(f"Component {i}: Interaction Matrix\nSingular value: {singular_value:.4f}")
-        plt.colorbar(im, ax=axes[0])
+        # Add colorbar to each subplot
+        plt.colorbar(im, ax=axes[i], fraction=0.046, pad=0.04)
 
-        # Plot flattened vector
-        axes[1].plot(input_vector.numpy(), "o-", alpha=0.7, markersize=2)
-        axes[1].axhline(y=0, color="k", linestyle="-", linewidth=0.5)
-        axes[1].set_xlabel("Flattened Index")
-        axes[1].set_ylabel("Component Value")
-        axes[1].set_title("Flattened View")
-        axes[1].grid(True, alpha=0.3)
+    fig.suptitle("Top Interaction Matrices (Right Singular Vectors)", fontsize=16, fontweight="bold")
+    plt.tight_layout()
+    fig.savefig(fig_path / "interaction_matrices_grid.png", dpi=150, bbox_inches="tight")
+    plt.close(fig)
 
-        plt.tight_layout()
-        fig.savefig(fig_path / f"input_component_{i}.png", dpi=150, bbox_inches="tight")
-        plt.close(fig)
-
-    logger.debug("Saved input component visualizations")
+    logger.debug("Saved interaction matrices grid visualization")
 
     # 3. Plot heatmap of top input components (Vh)
     n_show = min(n_top, Vh.shape[0])
