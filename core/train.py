@@ -27,7 +27,7 @@ class TrainingConfig:
     checkpoint_every: int = 100
     device: str = "cuda" if th.cuda.is_available() else "cpu"
     compile: bool = True
-    seed: int = 42
+    seed: int = 0
 
 
 class BilinearModularModel(nn.Module):
@@ -37,20 +37,21 @@ class BilinearModularModel(nn.Module):
     The network takes two one-hot encoded inputs and outputs logits for the result.
     """
 
-    def __init__(self, input_dim: int, hidden_dim: int, output_dim: int):
+    def __init__(self, input_dim: int, hidden_dim: int, output_dim: int, use_output_projection: bool = True):
         super().__init__()
         self.input_dim = input_dim  # type: ignore[misc]
         self.hidden_dim = hidden_dim  # type: ignore[misc]
         self.output_dim = output_dim  # type: ignore[misc]
+        self.use_output_projection = use_output_projection
 
         # Bilinear layer: combines two inputs via learned interaction
         self.bilinear = nn.Bilinear(input_dim, input_dim, hidden_dim, bias=True)
 
-        # Output projection
-        self.output = nn.Linear(hidden_dim, output_dim)
-
-        # Activation
-        self.relu = nn.ReLU()
+        # Optional output projection
+        if use_output_projection:
+            self.output = nn.Linear(hidden_dim, output_dim)
+        else:
+            self.output = None
 
     def forward(self, a: th.Tensor, b: th.Tensor) -> th.Tensor:
         """Forward pass.
@@ -64,10 +65,9 @@ class BilinearModularModel(nn.Module):
         """
         # Bilinear interaction between inputs
         hidden = self.bilinear(a, b)
-        hidden = self.relu(hidden)
 
-        # Project to output
-        logits = self.output(hidden)
+        # Project to output if using output projection
+        logits = self.output(hidden) if self.use_output_projection else hidden
 
         return logits
 
@@ -80,14 +80,6 @@ class BilinearModularModel(nn.Module):
         """
         # The bilinear layer weight has shape (hidden_dim, input_dim, input_dim)
         return self.bilinear.weight.data
-
-
-def setup_checkpointing(checkpoint_dir: str) -> Path:
-    """Set up checkpoint directory."""
-    checkpoint_path = Path(checkpoint_dir)
-    checkpoint_path.mkdir(parents=True, exist_ok=True)
-    logger.info(f"Checkpoint directory: {checkpoint_path.absolute()}")
-    return checkpoint_path
 
 
 def save_checkpoint(
@@ -106,7 +98,7 @@ def save_checkpoint(
             "model_state_dict": model.state_dict(),
             "optimizer_state_dict": optimizer.state_dict(),
             "loss": loss,
-            "config": config,
+            "config": vars(config),
         },
         checkpoint_file,
     )
@@ -249,6 +241,7 @@ def validate(
 
 @arguably.command
 def train(
+    *,
     mod_basis: int = 113,
     hidden_dim: int = 100,
     batch_size: int = 128,
@@ -260,7 +253,7 @@ def train(
     checkpoint_every: int = 100,
     device: str | None = None,
     compile: bool = True,
-    seed: int = 42,
+    seed: int = 0,
     resume_from: str | None = None,
 ) -> None:
     """Train a bilinear layer on modular arithmetic.
@@ -307,7 +300,9 @@ def train(
         th.cuda.manual_seed_all(seed)
 
     # Set up checkpoint directory
-    setup_checkpointing(checkpoint_dir)
+    checkpoint_path = Path(checkpoint_dir)
+    checkpoint_path.mkdir(parents=True, exist_ok=True)
+    logger.info(f"Checkpoint directory: {checkpoint_path.absolute()}")
 
     # Initialize model
     input_dim = mod_basis
@@ -316,7 +311,7 @@ def train(
     model = model.to(device)
 
     # Compile model for speed
-    if compile and hasattr(th, "compile"):
+    if compile:
         logger.info("Compiling model with torch.compile...")
         model = th.compile(model)  # type: ignore[misc]
 
